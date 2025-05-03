@@ -1,0 +1,22 @@
+<RCC>
+  <qresource prefix="/images">
+    <file alias="disk.png">../images/disk.png</file>
+    <file alias="edit-alignment.png">../images/edit-alignment.png</file>
+    <file alias="edit-bold.png">../images/edit-bold.png</file>
+    <file alias="edit-italic.png">../images/edit-italic.png</file>
+    <file alias="edit-underline.png">../images/edit-underline.png</file>
+    <file alias="printer.png">../images/printer.png</file>
+    <file alias="arrow-curve-180-left.png">../images/arrow-curve-180-left.png</file>
+    <file alias="arrow-curve.png">../images/arrow-curve.png</file>
+    <file alias="scissors.png">../images/scissors.png</file>
+    <file alias="document-copy.png">../images/document-copy.png</file>
+    <file alias="clipboard-paste-document-text.png">../images/clipboard-paste-document-text.png</file>
+    <file alias="selection-input.png">../images/selection-input.png</file>
+    <file alias="arrow-continue.png">../images/arrow-continue.png</file>
+    <file alias="edit-alignment-center.png">../images/edit-alignment-center.png</file>
+    <file alias="edit-alignment-right.png">../images/edit-alignment-right.png</file>
+    <file alias="edit-alignment-justify.png">../images/edit-alignment-justify.png</file>
+    <file alias="disk--pencil.png">../images/disk--pencil.png</file>
+    <file alias="blue-folder-open-document.png">../images/blue-folder-open-document.png</file>
+  </qresource>
+</RCC>

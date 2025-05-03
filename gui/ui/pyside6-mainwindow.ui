@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <!-- Defining the main class name for the UI -->
+ <class>MainWindow</class>
+ <!-- Main window widget, serving as the root container for the application -->
+ <widget class="QMainWindow" name="MainWindow">
+  <!-- Setting the initial geometry and position of the main window -->
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1079</width>
+    <height>873</height>
+   </rect>
+  </property>
+  <!-- Setting the title of the main window -->
+  <property name="windowTitle">
+   <string>My Software Notes</string>
+  </property>
+  <!-- Central widget containing the main layout of the application -->
+  <widget class="QWidget" name="centralwidget">
+   <!-- Splitter to allow resizing between left and right sections, filling the entire centralwidget -->
+   <layout class="QVBoxLayout" name="centralLayout">
+    <item>
+     <widget class="QSplitter" name="splitter">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <!-- Left section widget containing the note list -->
+      <widget class="QWidget" name="leftWidget">
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <item>
+         <!-- List widget for displaying notes, with dynamic width -->
+         <widget class="QListWidget" name="noteList">
+          <property name="styleSheet">
+           <string notr="true">border: 1px solid #E0E0E0;</string>
+          </property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <!-- Right section widget containing the table and content -->
+      <widget class="QWidget" name="rightWidget">
+       <layout class="QVBoxLayout" name="rightLayout">
+        <item>
+         <!-- Splitter to allow resizing between noteTable and noteContentTable -->
+         <widget class="QSplitter" name="verticalSplitter">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <!-- Table widget for displaying note titles and timestamps -->
+          <widget class="QTableWidget" name="noteTable">
+           <property name="styleSheet">
+            <string notr="true">background-color: #FFFFFF;</string>
+           </property>
+           <property name="rowCount">
+            <number>0</number>
+           </property>
+           <property name="columnCount">
+            <number>3</number>
+           </property>
+           <attribute name="horizontalHeaderStretchLastSection">
+            <bool>true</bool>
+           </attribute>
+           <column>
+            <property name="text">
+             <string>Title</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>Created time</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>Modified time</string>
+            </property>
+           </column>
+          </widget>
+          <!-- Table widget to wrap the note content area -->
+          <widget class="QTableWidget" name="noteContentTable">
+           <property name="styleSheet">
+            <string notr="true">background-color: #FFFFFF; QTableWidget { border: none; } QTableWidget::item { border: none; }</string>
+           </property>
+           <property name="rowCount">
+            <number>1</number>
+           </property>
+           <property name="columnCount">
+            <number>1</number>
+           </property>
+           <property name="showGrid">
+            <bool>false</bool>
+           </property>
+           <attribute name="horizontalHeaderVisible">
+            <bool>false</bool>
+           </attribute>
+           <attribute name="verticalHeaderVisible">
+            <bool>false</bool>
+           </attribute>
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+             <horstretch>0</horstretch>
+             <verstretch>1</verstretch>
+            </sizepolicy>
+           </property>
+           <row/>
+           <column/>
+           <item row="0" column="0"/>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <!-- Menu bar at the top of the window -->
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1079</width>
+     <height>33</height>
+    </rect>
+   </property>
+   <!-- Menu for file-related actions -->
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+   </widget>
+   <!-- Menu for edit-related actions -->
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+   </widget>
+   <!-- Menu for search-related actions -->
+   <widget class="QMenu" name="menuSearch">
+    <property name="title">
+     <string>Search</string>
+    </property>
+   </widget>
+   <!-- Menu for format-related actions -->
+   <widget class="QMenu" name="menuFormat">
+    <property name="title">
+     <string>Format</string>
+    </property>
+   </widget>
+   <!-- Menu for view-related actions -->
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+   </widget>
+   <!-- Menu for navigation actions -->
+   <widget class="QMenu" name="menuGo">
+    <property name="title">
+     <string>Go</string>
+    </property>
+   </widget>
+   <!-- Menu for tools-related actions -->
+   <widget class="QMenu" name="menuTools">
+    <property name="title">
+     <string>Tools</string>
+    </property>
+   </widget>
+   <!-- Menu for window-related actions -->
+   <widget class="QMenu" name="menuWindow">
+    <property name="title">
+     <string>Window</string>
+    </property>
+   </widget>
+   <!-- Menu for help-related actions -->
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
+   <addaction name="menuSearch"/>
+   <addaction name="menuFormat"/>
+   <addaction name="menuView"/>
+   <addaction name="menuGo"/>
+   <addaction name="menuTools"/>
+   <addaction name="menuWindow"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <!-- Tool bar for quick access actions -->
+  <widget class="QToolBar" name="toolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+
+  </widget>
+
+
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
