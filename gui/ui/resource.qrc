@@ -18,5 +18,10 @@
     <file alias="edit-alignment-justify.png">../images/edit-alignment-justify.png</file>
     <file alias="disk--pencil.png">../images/disk--pencil.png</file>
     <file alias="blue-folder-open-document.png">../images/blue-folder-open-document.png</file>
+
+    <file alias="folder-orange.png">../images/tree/folder-orange.png</file>
+    <file alias="folder-orange-open.png">../images/tree/folder-orange-open.png</file>
+    <file alias="note.png">../images/tree/note.png</file>
+    <file alias="trash.png">../images/tree/trash.png</file>
   </qresource>
 </RCC>

@@ -29,20 +29,7 @@
       <!-- Left section widget containing the note list -->
       <widget class="QWidget" name="leftWidget">
        <layout class="QVBoxLayout" name="verticalLayout">
-        <item>
-         <!-- List widget for displaying notes, with dynamic width -->
-         <widget class="QListWidget" name="noteList">
-          <property name="styleSheet">
-           <string notr="true">border: 1px solid #E0E0E0;</string>
-          </property>
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-         </widget>
-        </item>
+        
        </layout>
       </widget>
       <!-- Right section widget containing the table and content -->

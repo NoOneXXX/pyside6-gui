@@ -16,10 +16,9 @@ from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
     QIcon, QImage, QKeySequence, QLinearGradient,
     QPainter, QPalette, QPixmap, QRadialGradient,
     QTransform)
-from PySide6.QtWidgets import (QApplication, QHeaderView, QListWidget, QListWidgetItem,
-    QMainWindow, QMenu, QMenuBar, QSizePolicy,
-    QSplitter, QTableWidget, QTableWidgetItem, QToolBar,
-    QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QHeaderView, QMainWindow, QMenu,
+    QMenuBar, QSizePolicy, QSplitter, QTableWidget,
+    QTableWidgetItem, QToolBar, QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -38,17 +37,6 @@ class Ui_MainWindow(object):
         self.verticalLayout = QVBoxLayout(self.leftWidget)
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
-        self.noteList = QListWidget(self.leftWidget)
-        self.noteList.setObjectName(u"noteList")
-        self.noteList.setStyleSheet(u"border: 1px solid #E0E0E0;")
-        sizePolicy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.noteList.sizePolicy().hasHeightForWidth())
-        self.noteList.setSizePolicy(sizePolicy)
-
-        self.verticalLayout.addWidget(self.noteList)
-
         self.splitter.addWidget(self.leftWidget)
         self.rightWidget = QWidget(self.splitter)
         self.rightWidget.setObjectName(u"rightWidget")
@@ -83,11 +71,11 @@ class Ui_MainWindow(object):
         self.noteContentTable.setRowCount(1)
         self.noteContentTable.setColumnCount(1)
         self.noteContentTable.setShowGrid(False)
-        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        sizePolicy1.setHorizontalStretch(0)
-        sizePolicy1.setVerticalStretch(1)
-        sizePolicy1.setHeightForWidth(self.noteContentTable.sizePolicy().hasHeightForWidth())
-        self.noteContentTable.setSizePolicy(sizePolicy1)
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(1)
+        sizePolicy.setHeightForWidth(self.noteContentTable.sizePolicy().hasHeightForWidth())
+        self.noteContentTable.setSizePolicy(sizePolicy)
         self.verticalSplitter.addWidget(self.noteContentTable)
         self.noteContentTable.horizontalHeader().setVisible(False)
         self.noteContentTable.verticalHeader().setVisible(False)

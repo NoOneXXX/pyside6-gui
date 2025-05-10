@@ -6,7 +6,7 @@ from gui.ui import resource_rc
 
 
 from PySide6.QtCore import QSize, Qt, QtMsgType, qInstallMessageHandler, QUrl
-from PySide6.QtGui import QAction, QActionGroup, QFont, QIcon, QKeySequence, QTextCharFormat, QColor, QTextDocument, QImage
+from PySide6.QtGui import QAction, QActionGroup, QFont, QIcon, QKeySequence, QTextCharFormat, QTextDocument, QImage
 from PySide6.QtPrintSupport import QPrintDialog
 from PySide6.QtWidgets import (
     QApplication,
@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
     QStatusBar,
     QToolBar,
     QWidget,
-    QMenu,
     QColorDialog,
     QTextEdit,
     QLineEdit,
@@ -29,77 +28,26 @@ from PySide6.QtWidgets import (
 
 # Import the generated UI class from ui_main_window.py
 from gui.ui.ui_main_window import Ui_MainWindow
+from gui.ui.XPNotebookTree import  XPNotebookTree
+from gui.func.RichTextEdit import RichTextEdit
+
 
 # Custom Qt message handler for debugging
 def qt_message_handler(msg_type: QtMsgType, context, msg: str):
     print(f"Qt Message [{msg_type}]: {msg} ({context.file}:{context.line})")
 
-class RichTextEdit(QTextEdit):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAutoFormatting(QTextEdit.AutoFormattingFlag.AutoAll)
-        font = QFont("Times", 20)
-        self.setFont(font)
-        self.setFontPointSize(20)
+# 富文本框
 
-    def insertFromMimeData(self, source):
-        """Handle paste events to support images from clipboard."""
-        cursor = self.textCursor()
-        document = self.document()
-
-        if source.hasImage():
-            image = source.imageData()
-            if image.isNull():
-                super().insertFromMimeData(source)
-                return
-
-            image_name = f"image_{id(image)}.png"
-            document.addResource(QTextDocument.ImageResource, QUrl(image_name), image)
-            cursor.insertImage(image_name)
-            self.setTextCursor(cursor)
-        elif source.hasUrls():
-            for u in source.urls():
-                file_ext = os.path.splitext(str(u.toLocalFile()))[1].lower()
-                if u.isLocalFile() and file_ext in ['.png', '.jpg', '.jpeg', '.gif', '.bmp']:
-                    image = QImage(u.toLocalFile())
-                    document.addResource(QTextDocument.ImageResource, u, image)
-                    cursor.insertImage(u.toLocalFile())
-                else:
-                    break
-            else:
-                return
-        else:
-            super().insertFromMimeData(source)
-
-    def canInsertFromMimeData(self, source):
-        if source.hasImage() or source.hasUrls():
-            return True
-        return super().canInsertFromMimeData(source)
-
-    def contextMenuEvent(self, event):
-        """Customize the context menu to fix text shadow issue."""
-        menu = self.createStandardContextMenu()
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: white;
-                color: black;
-                border: 1px solid #CCCCCC;
-            }
-            QMenu::item {
-                background-color: transparent;
-                padding: 5px 20px;
-            }
-            QMenu::item:selected {
-                background-color: #E0E0E0;
-            }
-        """)
-        menu.exec(event.globalPos())
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+
+        # 加入目录树组件到左侧区域
+        tree_widget = XPNotebookTree("C:/Users/Dell/Desktop/temp/log")
+        self.ui.verticalLayout.addWidget(tree_widget)
 
         # Create editor using RichTextEdit
         self.editor = RichTextEdit(self)
