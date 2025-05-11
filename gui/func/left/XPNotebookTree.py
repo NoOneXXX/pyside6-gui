@@ -1,3 +1,4 @@
+import re
 import uuid
 import time
 
@@ -5,8 +6,8 @@ from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QTreeWidget,
     QTreeWidgetItem, QStyleFactory, QMessageBox, QHeaderView, QMenu, QInputDialog
 )
-from PySide6.QtGui import QIcon, QPixmap, QFont, QPalette, QColor, QAction
-from PySide6.QtCore import Qt, Slot
+from PySide6.QtGui import QIcon, QPixmap, QFont, QPalette, QColor, QAction, QImage, QTextDocument
+from PySide6.QtCore import Qt, Slot, QUrl
 import sys
 import os
 from gui.func.singel_pkg.single_manager import sm
@@ -14,9 +15,11 @@ from gui.func.utils.json_utils import JsonEditor
 from gui.func.utils.tools_utils import read_parent_id, create_metadata_file_under_dir, create_metadata_dir_under_dir
 
 class XPNotebookTree(QWidget):
-    def __init__(self, path, parent=None):
+    def __init__(self, path, rich_text_edit=None, parent=None):
         super().__init__(parent)
         self.custom_path = os.path.expanduser(path)
+        # 接收这个富文本框的参数属性
+        self.rich_text_edit = rich_text_edit
 
         # 图标资源
         self.folder_closed_icon = QIcon(QPixmap(":images/folder-orange.png"))
@@ -145,6 +148,7 @@ class XPNotebookTree(QWidget):
     '''
     左键点击的方法实现
     '''
+
     def on_item_clicked(self, item, column):
         if item.childCount() > 0:
             if item.isExpanded():
@@ -153,6 +157,44 @@ class XPNotebookTree(QWidget):
             else:
                 item.setExpanded(True)
                 self.handle_item_expanded(item)
+
+        # 额外添加：如果是文件，读取 HTML 内容显示到富文本
+        path = item.data(0, Qt.UserRole)
+        editor = JsonEditor()
+        content_type = editor.read_notebook_if_dir(path)
+        if content_type == "file" and self.rich_text_edit:
+            html_path = os.path.join(path, ".note.html")
+            # 将这个路径发送到 main 用来给富文本保存文件内容使用
+            sm.send_current_file_path_2_main_richtext_signal.emit(html_path)
+            if os.path.exists(html_path):
+                with open(html_path, "r", encoding="utf-8") as f:
+                    html_content = f.read()
+                    # Load HTML into rich text editor
+                    self.rich_text_edit.setHtml(html_content)
+
+                    # Set base URL for resolving relative paths
+                    base_dir = os.path.dirname(html_path)
+                    base_url = QUrl.fromLocalFile(base_dir + "/")  # Use forward slash for consistency
+                    self.rich_text_edit.document().setBaseUrl(base_url)
+
+                    # Extract and register image resources
+                    pattern = re.compile(r'<img[^>]+src="([^"]+)"')
+                    src_list = pattern.findall(html_content)
+                    doc = self.rich_text_edit.document()
+                    for src in src_list:
+                        src = src.strip()
+                        img_path = os.path.normpath(os.path.join(base_dir, src))
+                        img_url = QUrl.fromLocalFile(img_path)
+                        if os.path.exists(img_path):
+                            image = QImage(img_path)
+                            if not image.isNull():
+                                doc.addResource(QTextDocument.ImageResource, img_url, image)
+                                print(f"[Debug] Registered image resource: {img_url.toString()}")
+                            else:
+                                print(f"[Warning] Failed to load image: {img_path}")
+                        else:
+                            print(f"[Warning] Image file not found: {img_path}")
+
 
     '''
     右键点击事件的方法

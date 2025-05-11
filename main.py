@@ -1,12 +1,13 @@
 import os
+import re
 import sys
 
 # Import the resource file to register the resources
 # 这个文件的引用不能删除 否则下面的图片就会找不到文件
 from gui.ui import resource_rc
 
-from PySide6.QtCore import QSize, Qt, QtMsgType, qInstallMessageHandler, Slot
-from PySide6.QtGui import QAction, QActionGroup, QFont, QIcon, QKeySequence, QTextCharFormat
+from PySide6.QtCore import QSize, Qt, QtMsgType, qInstallMessageHandler, Slot, QUrl
+from PySide6.QtGui import QAction, QActionGroup, QFont, QIcon, QKeySequence, QTextCharFormat, QTextDocument, QImage
 from PySide6.QtPrintSupport import QPrintDialog
 from PySide6.QtWidgets import (
     QApplication,
@@ -43,10 +44,14 @@ class MainWindow(QMainWindow):
         self.ui.setupUi(self)
         # 绑定这个展示树状图的方法
         sm.left_tree_structure_rander_after_create_new_notebook_signal.connect(self.xp_tree_widget_)
-
+        # 用来接收富文本框的路径
+        self.richtext_saved_path = None
+        sm.send_current_file_path_2_main_richtext_signal.connect(self.receiver_path)
         # Create editor using RichTextEdit
         # 富文本框
         self.editor = RichTextEdit(self)
+        # 监听文件改动 只要文件改动就进行保存
+        self.editor.textChanged.connect(self.auto_save_note)
         self.editor.selectionChanged.connect(self.update_format)
 
         # Add editor to noteContentTable
@@ -343,6 +348,53 @@ class MainWindow(QMainWindow):
         )
 
         self.block_signals(self._format_actions, False)
+    '''
+    修改了富文本的内容 就自动的保存
+    '''
+
+    def auto_save_note(self):
+        """Auto-save note and ensure all inserted images are saved and displayable."""
+        if not self.richtext_saved_path:
+            return
+
+        try:
+            doc = self.editor.document()
+            html_content = self.editor.toHtml()
+            base_dir = os.path.dirname(self.richtext_saved_path)
+
+            # 匹配所有 <img src="xxx.png">
+            pattern = re.compile(r'<img[^>]+src="([^"]+)"')
+            src_list = pattern.findall(html_content)
+
+            for src in src_list:
+                src = src.strip()
+                img_path = os.path.join(base_dir, src)
+
+                # 如果图片不存在于磁盘，尝试从 document 中提取资源写入
+                if not os.path.exists(img_path):
+                    image = doc.resource(QTextDocument.ImageResource, QUrl(src))
+                    if isinstance(image, QImage) and not image.isNull():
+                        image.save(img_path, "PNG")
+                        print(f"[Auto Save] 保存图片: {img_path}")
+
+            # 保存 HTML（保持 src="xxx.png" 不做替换）
+            with open(self.richtext_saved_path, "w", encoding="utf-8") as f:
+                f.write(html_content)
+
+            # ✅ 最关键：重新注册文档中图片资源，确保编辑时能继续显示
+            for src in src_list:
+                src = src.strip()
+                img_path = os.path.join(base_dir, src)
+                if os.path.exists(img_path):
+                    image = QImage(img_path)
+                    if not image.isNull():
+                        doc.addResource(QTextDocument.ImageResource, QUrl(src), image)
+                        print(f"[Auto Save] 注册图片资源: {src}")
+
+            print(f"[Auto Save] HTML 和图片保存完成: {self.richtext_saved_path}")
+
+        except Exception as e:
+            print(f"[Auto Save Failed] {e}")
 
     def dialog_critical(self, s):
         dlg = QMessageBox(self)
@@ -498,7 +550,8 @@ class MainWindow(QMainWindow):
         print(file_path)
         # 先清空 verticalLayout 中的旧组件
         self.clear_layout(self.ui.verticalLayout)
-        tree_widget = XPNotebookTree(file_path)
+        tree_widget = XPNotebookTree(file_path, rich_text_edit=self.editor)
+
         self.ui.verticalLayout.addWidget(tree_widget)
 
     def clear_layout(self, layout):
@@ -519,6 +572,14 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         self.ui.splitter.setSizes([300, self.width() - 300])
         self.ui.verticalSplitter.setSizes([215, self.height() - 215])
+    '''
+    富文本框的路径接收
+    
+    '''
+    @Slot(str)
+    def receiver_path(self,path_):
+        print(f'------->{path_}')
+        self.richtext_saved_path = path_
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
