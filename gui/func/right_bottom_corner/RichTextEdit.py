@@ -46,7 +46,7 @@ class RichTextEdit(QTextEdit):
         if source.hasImage() or source.hasUrls():
             return True
         return super().canInsertFromMimeData(source)
-
+ # 右键鼠标点击事件
     def contextMenuEvent(self, event):
         """Customize the context menu to fix text shadow issue."""
         menu = self.createStandardContextMenu()

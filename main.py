@@ -2,11 +2,11 @@ import os
 import sys
 
 # Import the resource file to register the resources
+# 这个文件的引用不能删除 否则下面的图片就会找不到文件
 from gui.ui import resource_rc
 
-
-from PySide6.QtCore import QSize, Qt, QtMsgType, qInstallMessageHandler, QUrl
-from PySide6.QtGui import QAction, QActionGroup, QFont, QIcon, QKeySequence, QTextCharFormat, QTextDocument, QImage
+from PySide6.QtCore import QSize, Qt, QtMsgType, qInstallMessageHandler, Slot
+from PySide6.QtGui import QAction, QActionGroup, QFont, QIcon, QKeySequence, QTextCharFormat
 from PySide6.QtPrintSupport import QPrintDialog
 from PySide6.QtWidgets import (
     QApplication,
@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QToolBar,
     QWidget,
     QColorDialog,
-    QTextEdit,
     QLineEdit,
     QPushButton,
     QHBoxLayout,
@@ -28,15 +27,13 @@ from PySide6.QtWidgets import (
 
 # Import the generated UI class from ui_main_window.py
 from gui.ui.ui_main_window import Ui_MainWindow
-from gui.ui.XPNotebookTree import  XPNotebookTree
-from gui.func.RichTextEdit import RichTextEdit
-
-
+from gui.func.left.XPNotebookTree import  XPNotebookTree
+from gui.func.right_bottom_corner.RichTextEdit import RichTextEdit
+from gui.func.top_menu.file_action import FileActions
+from gui.func.singel_pkg.single_manager import sm
 # Custom Qt message handler for debugging
 def qt_message_handler(msg_type: QtMsgType, context, msg: str):
     print(f"Qt Message [{msg_type}]: {msg} ({context.file}:{context.line})")
-
-# 富文本框
 
 
 class MainWindow(QMainWindow):
@@ -44,12 +41,14 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
-
+        # 绑定这个展示树状图的方法
+        sm.left_tree_structure_rander_after_create_new_notebook_signal.connect(self.xp_tree_widget_)
         # 加入目录树组件到左侧区域
-        tree_widget = XPNotebookTree("C:/Users/Dell/Desktop/temp/log")
-        self.ui.verticalLayout.addWidget(tree_widget)
+        # tree_widget = XPNotebookTree("C:\\Users\\Dell\\Desktop\\temp\\log")
+        # self.ui.verticalLayout.addWidget(tree_widget)
 
         # Create editor using RichTextEdit
+        # 富文本框
         self.editor = RichTextEdit(self)
         self.editor.selectionChanged.connect(self.update_format)
 
@@ -69,28 +68,19 @@ class MainWindow(QMainWindow):
         self.status = QStatusBar()
         self.setStatusBar(self.status)
 
-        file_toolbar = QToolBar("File")
-        file_toolbar.setIconSize(QSize(14, 14))
-        self.addToolBar(file_toolbar)
-        file_menu = self.menuBar().addMenu("&File")
+        # 初始化功能类
+        self.file_actions = FileActions(self)  # 传入 self 以便弹窗等能绑定主窗口
+        self.ui.menuFile.addAction(self.file_actions.create_file_action())
 
-        open_file_action = QAction(
-            QIcon(":/images/blue-folder-open-document.png"),
-            "Open file...",
-            self,
-        )
-        open_file_action.setStatusTip("Open file")
-        open_file_action.triggered.connect(self.file_open)
-        file_menu.addAction(open_file_action)
-        file_toolbar.addAction(open_file_action)
+
+
 
         save_file_action = QAction(
             QIcon(":/images/disk.png"), "Save", self
         )
         save_file_action.setStatusTip("Save current page")
         save_file_action.triggered.connect(self.file_save)
-        file_menu.addAction(save_file_action)
-        file_toolbar.addAction(save_file_action)
+
 
         saveas_file_action = QAction(
             QIcon(":/images/disk--pencil.png"),
@@ -99,8 +89,7 @@ class MainWindow(QMainWindow):
         )
         saveas_file_action.setStatusTip("Save current page to specified file")
         saveas_file_action.triggered.connect(self.file_saveas)
-        file_menu.addAction(saveas_file_action)
-        file_toolbar.addAction(saveas_file_action)
+
 
         print_action = QAction(
             QIcon(":/images/printer.png"),
@@ -109,8 +98,7 @@ class MainWindow(QMainWindow):
         )
         print_action.setStatusTip("Print current page")
         print_action.triggered.connect(self.file_print)
-        file_menu.addAction(print_action)
-        file_toolbar.addAction(print_action)
+
 
         edit_toolbar = QToolBar("Edit")
         edit_toolbar.setIconSize(QSize(16, 16))
@@ -503,6 +491,30 @@ class MainWindow(QMainWindow):
             self.editor.setTextCursor(cursor)
         else:
             self.status.showMessage("Text not found", 5000)
+
+    '''
+    绑定树状图的结构 当创建了新的笔记的时候就将树状图重新渲染
+    '''
+    @Slot(str)
+    def xp_tree_widget_(self, file_path):
+        print(file_path)
+        # 先清空 verticalLayout 中的旧组件
+        self.clear_layout(self.ui.verticalLayout)
+        tree_widget = XPNotebookTree(file_path)
+        self.ui.verticalLayout.addWidget(tree_widget)
+
+    def clear_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+            else:
+                # 可能是 layout 或 spacerItem
+                child_layout = item.layout()
+                if child_layout is not None:
+                    self.clear_layout(child_layout)
 
     def resizeEvent(self, event):
         """Maintain splitter sizes on resize."""

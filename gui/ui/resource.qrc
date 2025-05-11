@@ -23,5 +23,6 @@
     <file alias="folder-orange-open.png">../images/tree/folder-orange-open.png</file>
     <file alias="note.png">../images/tree/note.png</file>
     <file alias="trash.png">../images/tree/trash.png</file>
+    <file alias="open.png">../images/tree/open.png</file>
   </qresource>
 </RCC>
