@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 class JsonEditor:
@@ -51,6 +52,19 @@ class JsonEditor:
         self.data = new_data
         self._loaded = True
         return self
+
+    '''
+    读取json文件的内容
+    '''
+    def read_notebook_if_dir(self, folder_path):
+        meta_path = os.path.join(folder_path, ".metadata.json")
+        if not os.path.exists(meta_path):
+            return "未知笔记"
+
+        with open(meta_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("node", {}).get("detail_info", {}).get("content_type", "")
+
 if __name__ == '__main__':
     # 使用示例
     # def add_tag(data):
@@ -61,13 +75,18 @@ if __name__ == '__main__':
 
 
     # 创建编辑器并加载
-    editor = JsonEditor().load()
-
-    # 直接修改字段
-    data = editor.get_data()
-    data['tag'] = 'new'
-    data['priority'] = 5
-
-    # 写入到原文件或新文件
-    editor.write('output.json')
+    # editor = JsonEditor().load()
+    #
+    # # 直接修改字段
+    # data = editor.get_data()
+    # data['tag'] = 'new'
+    # data['priority'] = 5
+    #
+    # # 写入到原文件或新文件
+    # editor.write('output.json')
+    dir_path = 'C:/Users/Dell/Desktop'
+    name = 'te'
+    file_path = os.path.join(dir_path, name)
+    print(file_path)
+    os.makedirs(file_path, exist_ok=True)
 

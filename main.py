@@ -43,9 +43,6 @@ class MainWindow(QMainWindow):
         self.ui.setupUi(self)
         # 绑定这个展示树状图的方法
         sm.left_tree_structure_rander_after_create_new_notebook_signal.connect(self.xp_tree_widget_)
-        # 加入目录树组件到左侧区域
-        # tree_widget = XPNotebookTree("C:\\Users\\Dell\\Desktop\\temp\\log")
-        # self.ui.verticalLayout.addWidget(tree_widget)
 
         # Create editor using RichTextEdit
         # 富文本框
@@ -70,9 +67,10 @@ class MainWindow(QMainWindow):
 
         # 初始化功能类
         self.file_actions = FileActions(self)  # 传入 self 以便弹窗等能绑定主窗口
+        # 创建笔记
         self.ui.menuFile.addAction(self.file_actions.create_file_action())
-
-
+        # 打开笔记
+        self.ui.menuFile.addAction(self.file_actions.open_notebook_action())
 
 
         save_file_action = QAction(

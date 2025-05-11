@@ -1,13 +1,17 @@
+import uuid
+import time
 
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QTreeWidget,
     QTreeWidgetItem, QStyleFactory, QMessageBox, QHeaderView, QMenu, QInputDialog
 )
 from PySide6.QtGui import QIcon, QPixmap, QFont, QPalette, QColor, QAction
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 import sys
 import os
-
+from gui.func.singel_pkg.single_manager import sm
+from gui.func.utils.json_utils import JsonEditor
+from gui.func.utils.tools_utils import read_parent_id, create_metadata_file_under_dir, create_metadata_dir_under_dir
 
 class XPNotebookTree(QWidget):
     def __init__(self, path, parent=None):
@@ -26,7 +30,13 @@ class XPNotebookTree(QWidget):
         try:
             for name in os.listdir(path):
                 full_path = os.path.join(path, name)
-                if os.path.isdir(full_path):
+                # 判断这个文件夹是不是文件 读取它下面的json配置
+                editor = JsonEditor()
+                content_type = editor.read_notebook_if_dir(full_path)
+
+                print(f"[populate_tree] {name} => content_type={content_type}")
+
+                if 'dir' == content_type:
                     folder_item = QTreeWidgetItem(parent_item)
                     folder_item.setText(0, name)
 
@@ -43,11 +53,14 @@ class XPNotebookTree(QWidget):
                     # 懒加载标记项
                     folder_item.addChild(QTreeWidgetItem())
                     folder_item.setData(0, Qt.UserRole, full_path)
-                else:
+                elif content_type == "file":
                     file_item = QTreeWidgetItem(parent_item)
                     file_item.setText(0, os.path.splitext(name)[0])
                     file_item.setIcon(0, self.file_icon)
                     file_item.setData(0, Qt.UserRole, full_path)
+                    #  也允许子文件结构（懒加载子节点）
+                    file_item.addChild(QTreeWidgetItem())  # 懒加载标记
+
         except PermissionError:
             pass
 
@@ -108,7 +121,8 @@ class XPNotebookTree(QWidget):
         self.tree.itemCollapsed.connect(self.handle_item_collapsed)
 
         root = QTreeWidgetItem(self.tree)
-        root.setText(0, "notebook")
+        notebook_name = os.path.basename(self.custom_path)
+        root.setText(0, notebook_name)
         root.setIcon(0, self.folder_closed_icon)
         font = QFont("Segoe UI", 12)
         font.setBold(True)
@@ -152,17 +166,20 @@ class XPNotebookTree(QWidget):
 
         open_action = QAction(QIcon(":images/open.png"), "打开", self)
         rename_action = QAction(QIcon(":images/open.png"), "重命名", self)
-        create_file_action = QAction(QIcon(":images/open.png"), "创建一个文件", self)
+        create_file_action = QAction(QIcon(":images/open.png"), "创建子文件", self)
+        create_dir_action = QAction(QIcon(":images/open.png"), "创建文件夹", self)
         delete_action = QAction(QIcon(":images/open.png"), "删除", self)
         # 方法绑定
         open_action.triggered.connect(lambda: self.open_item(item))
         rename_action.triggered.connect(lambda: self.rename_item(item))
         create_file_action.triggered.connect(lambda: self.create_file_item(item))
+        create_dir_action.triggered.connect(lambda: self.create_dir_action(item))
         delete_action.triggered.connect(lambda: self.delete_item(item))
         # 方法绑定 结束
         menu.addAction(open_action)
         menu.addAction(rename_action)
         menu.addAction(create_file_action)
+        menu.addAction(create_dir_action)
 
 
         menu.addAction(delete_action)
@@ -218,16 +235,22 @@ class XPNotebookTree(QWidget):
     '''
     def create_file_item(self, item, index=0):
         dir_path = item.data(0, Qt.UserRole)
-        name = '新建文件.html'
+        name = '新建文件'
         if index != 0:
-            name = '新建文件-' + str(index) + '.html'
+            name = '新建文件-' + str(index)
         file_path = os.path.join(dir_path, name)
         # 如果文件名字存在了就递归加1 然后重新创建
         if os.path.exists(file_path):
             index = index + 1
             self.create_file_item(item, index)
         try:
-            with open(file_path, "w", encoding="utf-8") as f:
+
+            # 创建一个空文件夹
+            os.makedirs(file_path, exist_ok=True)
+            # 创建 metadata.json 文件
+            create_metadata_file_under_dir(file_path)
+            note_path = os.path.join(file_path, ".note.html")
+            with open(note_path, "w", encoding="utf-8") as f:
                 f.write("<html></html>")
             # 创建一个json文件 用来持久化当前表格的数据
             # 刷新该目录项
@@ -235,6 +258,38 @@ class XPNotebookTree(QWidget):
             item.addChild(QTreeWidgetItem())  # 添加懒加载标记
             item.setExpanded(False)  # 可选：收起后重新展开加载
             item.setExpanded(True)
+
+        except Exception as e:
+            QMessageBox.critical(self, "创建失败", f"无法创建文件:\n{e}")
+
+    '''
+    创建文件夹
+    '''
+    def create_dir_action(self, item, index_ = 0):
+        dir_path = item.data(0, Qt.UserRole)
+        name = '新建文件'
+        if index_ != 0:
+            name = '新建文件-' + str(index_)
+        # 获取父级目录
+        print(f'this is create dir path====:{dir_path}')
+        # parent_dir = os.path.dirname(dir_path)
+        file_path = os.path.join(dir_path, name)
+        print(f'this is create dir path====:{file_path}')
+        # 如果文件名字存在了就递归加1 然后重新创建
+        if os.path.exists(file_path):
+            index_ = index_ + 1
+            self.create_dir_action(item, index_)
+        try:
+            # 创建一个空文件夹
+            os.makedirs(file_path, exist_ok=True)
+            # 创建metadata.json文件 文件类型是dir类型
+            create_metadata_dir_under_dir(file_path)
+            # 刷新当前树节点显示
+            item.takeChildren()
+            item.addChild(QTreeWidgetItem())  # 懒加载标记
+            item.setExpanded(False)
+            item.setExpanded(True)
+
         except Exception as e:
             QMessageBox.critical(self, "创建失败", f"无法创建文件:\n{e}")
 
@@ -247,7 +302,12 @@ class XPNotebookTree(QWidget):
         return os.path.join(self.custom_path, *parts)
 
     def handle_item_expanded(self, item):
-        item.setIcon(0, self.folder_open_icon)
+        path = item.data(0, Qt.UserRole)
+
+        editor = JsonEditor()
+        content_type = editor.read_notebook_if_dir(path)
+        self.set_item_icon(item, content_type)
+
         if item.childCount() == 1 and item.child(0).text(0) == "":
             item.takeChild(0)
             path = item.data(0, Qt.UserRole)
@@ -256,7 +316,22 @@ class XPNotebookTree(QWidget):
 
 
     def handle_item_collapsed(self, item):
-        item.setIcon(0, self.folder_closed_icon)
+        # item.setIcon(0, self.folder_closed_icon)
+        path = item.data(0, Qt.UserRole)
+        editor = JsonEditor()
+        content_type = editor.read_notebook_if_dir(path)
+        self.set_item_icon(item, content_type)
+    '''
+    进行封装 如果是文件夹就用文件夹的图标 文件就用文件的图标
+    '''
+    def set_item_icon(self, item, content_type):
+        if content_type == "dir":
+            item.setIcon(0, self.folder_closed_icon)
+        elif content_type == "file":
+            item.setIcon(0, self.file_icon)
+        else:
+            item.setIcon(0, QIcon())  # 默认
+
 
 
 

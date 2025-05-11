@@ -6,6 +6,8 @@ from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 import uuid
 import time
+
+from gui.func.left.XPNotebookTree import XPNotebookTree
 from gui.func.utils.json_utils import JsonEditor
 from gui.data.NoteDB import NoteDB
 from gui.func.singel_pkg.single_manager import sm
@@ -22,22 +24,20 @@ class FileActions:
         self.parent = parent  # 通常是 QMainWindow，用来绑定对话框等
         self.note_db = None
 
-    def create_folder(self):
+    def open_folder(self):
         # 弹出对话框选择要创建新文件夹的位置（用户选择一个父目录）
-        parent_dir = QFileDialog.getExistingDirectory(
-            self.parent, "选择要创建文件夹的位置"
+        folder_path = QFileDialog.getExistingDirectory(
+            self.parent, "选择要打开的笔记本"
         )
-        if parent_dir:
-            folder_name, ok = QFileDialog.getText(self.parent, "新建文件夹", "请输入文件夹名称：")
-            if ok and folder_name:
-                new_folder_path = os.path.join(parent_dir, folder_name)
-                try:
-                    os.makedirs(new_folder_path, exist_ok=False)
-                    QMessageBox.information(self.parent, "成功", f"已创建文件夹：{new_folder_path}")
-                except FileExistsError:
-                    QMessageBox.warning(self.parent, "失败", "文件夹已存在")
-                except Exception as e:
-                    QMessageBox.critical(self.parent, "错误", str(e))
+        if folder_path:
+            metadata_path = os.path.join(folder_path, ".metadata.json")
+            if not os.path.exists(metadata_path):
+                QMessageBox.warning(self.parent, "打开失败", "该目录不是有效的笔记本")
+                return
+
+        # 笔记被成功创建后 发射信号通知主窗口要进行渲染左边的树
+        sm.left_tree_structure_rander_after_create_new_notebook_signal.emit(folder_path)
+
 
     '''
     创建笔记
@@ -66,11 +66,13 @@ class FileActions:
 
                 # 笔记被成功创建后 发射信号通知主窗口要进行渲染左边的树
                 sm.left_tree_structure_rander_after_create_new_notebook_signal.emit(file_path)
-                # QMessageBox.information(self.parent, "成功", f"已创建笔记：{file_path}")
 
             except Exception as e:
                 QMessageBox.critical(self.parent, "错误", str(e))
 
+    '''
+    创建笔记本的action
+    '''
     def create_file_action(self):
         action = QAction(
             QIcon(":/images/blue-folder-open-document.png"),
@@ -79,6 +81,19 @@ class FileActions:
         )
         action.setStatusTip("创建一个新笔记")
         action.triggered.connect(self.create_file)
+        return action
+
+    '''
+    打开笔记
+    '''
+    def open_notebook_action(self):
+        action = QAction(
+            QIcon(":/images/blue-folder-open-document.png"),
+            "打开笔记",
+            self.parent
+        )
+        action.setStatusTip("打开笔记")
+        action.triggered.connect(self.open_folder)
         return action
 
     '''
