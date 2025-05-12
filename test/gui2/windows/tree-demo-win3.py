@@ -81,26 +81,33 @@ class XPNotebookTree(QWidget):
             palette.setColor(QPalette.HighlightedText, QColor("#000000"))
             self.tree.setPalette(palette)
         else:
-            self.tree.setStyleSheet("""
-                QTreeWidget {
-                    background-color: #F0F0F0;
-                    alternate-background-color: #FFFFFF;
-                    color: #000000;
-                    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
-                    font-size: 12pt;
-                }
-                QTreeWidget::item {
-                    padding-top: 8px;
-                    padding-bottom: 8px;
-                }
-                QTreeWidget::item:selected {
-                    background-color: #E6F0FA;
-                    color: #000000;
-                }
-                QTreeWidget::item:hover {
-                    background-color: #EDF6FF;
-                }
-            """)
+            style = QStyleFactory.create("windows")
+            if style:
+                self.tree.setStyle(style)
+            palette = self.tree.palette()
+            palette.setColor(QPalette.Highlight, QColor("#E6F0FA"))
+            palette.setColor(QPalette.HighlightedText, QColor("#000000"))
+            self.tree.setPalette(palette)
+            # self.tree.setStyleSheet("""
+            #     QTreeWidget {
+            #         background-color: #F0F0F0;
+            #         alternate-background-color: #FFFFFF;
+            #         color: #000000;
+            #         font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+            #         font-size: 12pt;
+            #     }
+            #     QTreeWidget::item {
+            #         padding-top: 8px;
+            #         padding-bottom: 8px;
+            #     }
+            #     QTreeWidget::item:selected {
+            #         background-color: #E6F0FA;
+            #         color: #000000;
+            #     }
+            #     QTreeWidget::item:hover {
+            #         background-color: #EDF6FF;
+            #     }
+            # """)
 
         self.tree.itemExpanded.connect(self.handle_item_expanded)
         self.tree.itemCollapsed.connect(self.handle_item_collapsed)
@@ -131,7 +138,9 @@ class XPNotebookTree(QWidget):
 
 def main():
     app = QApplication(sys.argv)
-    widget = XPNotebookTree("C:/Users/Dell/Desktop/temp/log")  # 替换为你自己的路径
+    # widget = XPNotebookTree("C:/Users/Dell/Desktop/temp/log")  # 替换为你自己的路径
+    #mac /Users/echo/Desktop/temp
+    widget = XPNotebookTree("/Users/echo/Desktop/temp")  # 替换为你自己的路径
     widget.resize(300, 500)
     widget.setWindowTitle(f"目录树：{widget.custom_path}")
     widget.show()

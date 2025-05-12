@@ -89,36 +89,14 @@ class XPNotebookTree(QWidget):
         self.tree.setAllColumnsShowFocus(True)
         self.tree.header().setStretchLastSection(True)
         self.tree.header().setSectionResizeMode(0, QHeaderView.Stretch)
+        style = QStyleFactory.create("windows")
+        if style:
+            self.tree.setStyle(style)
+        palette = self.tree.palette()
+        palette.setColor(QPalette.Highlight, QColor("#E6F0FA"))
+        palette.setColor(QPalette.HighlightedText, QColor("#000000"))
+        self.tree.setPalette(palette)
 
-        if sys.platform == "win32":
-            style = QStyleFactory.create("windows")
-            if style:
-                self.tree.setStyle(style)
-            palette = self.tree.palette()
-            palette.setColor(QPalette.Highlight, QColor("#E6F0FA"))
-            palette.setColor(QPalette.HighlightedText, QColor("#000000"))
-            self.tree.setPalette(palette)
-        else:
-            self.tree.setStyleSheet("""
-                QTreeWidget {
-                    background-color: #F0F0F0;
-                    alternate-background-color: #FFFFFF;
-                    color: #000000;
-                    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
-                    font-size: 12pt;
-                }
-                QTreeWidget::item {
-                    padding-top: 8px;
-                    padding-bottom: 8px;
-                }
-                QTreeWidget::item:selected {
-                    background-color: #E6F0FA;
-                    color: #000000;
-                }
-                QTreeWidget::item:hover {
-                    background-color: #EDF6FF;
-                }
-            """)
 
         self.tree.itemExpanded.connect(self.handle_item_expanded)
         self.tree.itemCollapsed.connect(self.handle_item_collapsed)
