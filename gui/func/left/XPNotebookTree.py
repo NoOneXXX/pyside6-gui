@@ -13,7 +13,7 @@ import os
 from gui.func.singel_pkg.single_manager import sm
 from gui.func.utils.json_utils import JsonEditor
 from gui.func.utils.tools_utils import read_parent_id, create_metadata_file_under_dir, create_metadata_dir_under_dir
-
+from gui.func.left.CustomTreeItemDelegate import CustomTreeItemDelegate
 class XPNotebookTree(QWidget):
     def __init__(self, path, rich_text_edit=None, parent=None):
         super().__init__(parent)
@@ -24,7 +24,7 @@ class XPNotebookTree(QWidget):
         # 图标资源
         self.folder_closed_icon = QIcon(QPixmap(":images/folder-orange.png"))
         self.folder_open_icon = QIcon(QPixmap(":images/folder-orange-open.png"))
-        self.file_icon = QIcon(QPixmap(":images/note.png"))
+        self.file_icon = QIcon(QPixmap(":images/note-violet.png"))
 
         self.tree = None
         self.setup_ui()
@@ -122,6 +122,43 @@ class XPNotebookTree(QWidget):
 
         # 左键点击事件 点击的时候就展开 不是只有点击前面的加号减号才展开
         self.tree.itemClicked.connect(self.on_item_clicked)
+        self.tree.setItemDelegate(CustomTreeItemDelegate())
+        self.tree.itemChanged.connect(self.on_item_renamed)
+
+    def on_item_renamed(self, item, column):
+        if not item or column != 0:
+            return
+
+        old_path = item.data(0, Qt.UserRole)
+        if not old_path or not os.path.exists(old_path):
+            return
+
+        # 只处理刚创建的项
+        is_new = item.data(0, Qt.UserRole + 1)
+        if not is_new:
+            return
+
+        new_name = item.text(0).strip()
+        if not new_name or new_name == os.path.basename(old_path):
+            return
+
+        parent_item = item.parent()
+        parent_path = self.custom_path if parent_item is None else parent_item.data(0, Qt.UserRole)
+        new_path = os.path.join(parent_path, new_name)
+
+        if os.path.exists(new_path):
+            QMessageBox.warning(self, "重命名失败", "已存在同名文件/文件夹")
+            item.setText(0, os.path.basename(old_path))
+            return
+
+        try:
+            os.rename(old_path, new_path)
+            item.setData(0, Qt.UserRole, new_path)
+            item.setData(0, Qt.UserRole + 1, None)  # ✅ 移除“刚创建”标记
+            self._update_child_user_roles(item, old_path, new_path)
+        except Exception as e:
+            QMessageBox.critical(self, "重命名失败", str(e))
+            item.setText(0, os.path.basename(old_path))
 
     '''
     左键点击的方法实现
@@ -253,31 +290,36 @@ class XPNotebookTree(QWidget):
     创建一个新的文件
     从ui下面的home.html 取出文件的模板
     '''
+
     def create_file_item(self, item, index=0):
         dir_path = item.data(0, Qt.UserRole)
-        name = '新建文件'
-        if index != 0:
-            name = '新建文件-' + str(index)
+        name = '新建文件' if index == 0 else f'新建文件-{index}'
         file_path = os.path.join(dir_path, name)
-        # 如果文件名字存在了就递归加1 然后重新创建
-        if os.path.exists(file_path):
-            index = index + 1
-            self.create_file_item(item, index)
-        try:
 
-            # 创建一个空文件夹
+        if os.path.exists(file_path):
+            self.create_file_item(item, index + 1)
+            return
+
+        try:
             os.makedirs(file_path, exist_ok=True)
-            # 创建 metadata.json 文件
             create_metadata_file_under_dir(file_path)
             note_path = os.path.join(file_path, ".note.html")
             with open(note_path, "w", encoding="utf-8") as f:
                 f.write("<html></html>")
-            # 创建一个json文件 用来持久化当前表格的数据
-            # 刷新该目录项
-            item.takeChildren()
-            item.addChild(QTreeWidgetItem())  # 添加懒加载标记
-            item.setExpanded(False)  # 可选：收起后重新展开加载
+
+            new_item = QTreeWidgetItem()
+            new_item.setText(0, name)
+            new_item.setIcon(0, self.file_icon)
+            new_item.setData(0, Qt.UserRole, file_path)
+            new_item.setData(0, Qt.UserRole + 1, True)  #  标记“刚创建”
+            new_item.setFlags(new_item.flags() | Qt.ItemIsEditable)
+            # new_item.addChild(QTreeWidgetItem())
+
+            item.addChild(new_item)
             item.setExpanded(True)
+
+            self.tree.setCurrentItem(new_item)
+            self.tree.editItem(new_item, 0)
 
         except Exception as e:
             QMessageBox.critical(self, "创建失败", f"无法创建文件:\n{e}")
@@ -285,34 +327,37 @@ class XPNotebookTree(QWidget):
     '''
     创建文件夹
     '''
-    def create_dir_action(self, item, index_ = 0):
+
+    def create_dir_action(self, item, index_=0):
         dir_path = item.data(0, Qt.UserRole)
-        name = '新建文件'
-        if index_ != 0:
-            name = '新建文件-' + str(index_)
-        # 获取父级目录
-        print(f'this is create dir path====:{dir_path}')
-        # parent_dir = os.path.dirname(dir_path)
+        name = '新建文件' if index_ == 0 else f'新建文件-{index_}'
         file_path = os.path.join(dir_path, name)
-        print(f'this is create dir path====:{file_path}')
-        # 如果文件名字存在了就递归加1 然后重新创建
+
         if os.path.exists(file_path):
-            index_ = index_ + 1
-            self.create_dir_action(item, index_)
+            self.create_dir_action(item, index_ + 1)
+            return
+
         try:
-            # 创建一个空文件夹
             os.makedirs(file_path, exist_ok=True)
-            # 创建metadata.json文件 文件类型是dir类型
             create_metadata_dir_under_dir(file_path)
-            # 刷新当前树节点显示
-            item.takeChildren()
-            item.addChild(QTreeWidgetItem())  # 懒加载标记
-            item.setExpanded(False)
+
+            # 不刷新，而是手动插入新节点
+            new_item = QTreeWidgetItem()
+            new_item.setText(0, name)
+            new_item.setIcon(0, self.folder_closed_icon)
+            new_item.setData(0, Qt.UserRole, file_path)
+            new_item.setData(0, Qt.UserRole + 1, True)  # 标记刚创建
+            new_item.setFlags(new_item.flags() | Qt.ItemIsEditable)
+            # new_item.addChild(QTreeWidgetItem())  # 懒加载标记
+
             item.setExpanded(True)
+            item.addChild(new_item)
+
+            self.tree.setCurrentItem(new_item)
+            self.tree.editItem(new_item, 0)
 
         except Exception as e:
-            QMessageBox.critical(self, "创建失败", f"无法创建文件:\n{e}")
-
+            QMessageBox.critical(self, "创建失败", f"无法创建文件夹:\n{e}")
 
     def get_item_path(self, item):
         parts = []

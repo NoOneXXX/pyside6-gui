@@ -30,14 +30,32 @@ QPushButton:pressed {
 }
 
 /* === 输入框 === */
-QLineEdit, QTextEdit, QPlainTextEdit {
+ QTextEdit, QPlainTextEdit {
     background-color: #ffffff;
     border: 1px solid #bbb;
     border-radius: 5px;
-    padding: 4px;
+    padding: 1px;
     color: #000000;
 }
+/* === 控制右上角的搜索框 === */
+QLineEdit {
+    background-color: #ffffff;
+    border: 1px solid #bbb;
+    border-radius: 5px;
+    padding: 1px;
+    color: #000000;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    padding-left: 6px;
+    padding-right: 6px;
+    height: 24px;
+    font-size: 12px;
+}
 
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
+    border: 1px solid #3A8EDB;
+    outline: none;
+}
 /* === 表格与列表 === */
 QTableWidget, QTreeWidget, QListWidget {
     background-color: #ffffff;
