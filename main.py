@@ -47,16 +47,17 @@ class MainWindow(QMainWindow):
         self.placeholder_frame.setMinimumWidth(200)
         self.placeholder_frame.setFrameShape(QFrame.StyledPanel)
         self.placeholder_frame.setStyleSheet("""
-            QFrame {{
-                background-image: url(:images/Adansonia_grandidieri04.jpg);
+            QFrame {
+                background-color: rgba(255, 255, 255, 100);  /* 白色半透明遮罩 */
+                border: 1px solid #cccccc;
+                border-radius: 6px;
+                background-image: url(:images/grandidier.jpg);
                 background-repeat: no-repeat;
                 background-position: center;
                 background-origin: content;
-                background-color: rgba(255, 255, 255, 120);  /* 半透明覆盖 */
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-            }}
+            }
         """)
+
         # 加入左侧 verticalLayout（树位置）
         self.ui.verticalLayout.addWidget(self.placeholder_frame)
 

@@ -1,7 +1,7 @@
 import re
 import uuid
 import time
-
+from gui.ui import resource_rc
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QTreeWidget,
     QTreeWidgetItem, QStyleFactory, QMessageBox, QHeaderView, QMenu, QInputDialog
@@ -444,4 +444,8 @@ def main():
     sys.exit(app.exec())
 
 if __name__ == "__main__":
-    main()
+    import PySide6.QtCore as QtCore
+
+    print(QtCore.QFile.exists(":images/grandidier.jpg"))
+
+    # main()
