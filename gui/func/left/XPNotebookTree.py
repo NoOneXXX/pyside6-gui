@@ -76,9 +76,9 @@ class XPNotebookTree(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        header = QLabel("Notebook")
-        header.setStyleSheet("background-color: #F0F0F0; padding: 2px; font-weight: bold;")
-        layout.addWidget(header)
+        # header = QLabel("")
+        # header.setStyleSheet("background-color: #F0F0F0; padding: 2px; font-weight: bold;")
+        # layout.addWidget(header)
 
         self.tree = QTreeWidget()
         self.tree.setColumnCount(1)

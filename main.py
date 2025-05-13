@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QHBoxLayout,
-    QSizePolicy
+    QSizePolicy, QFrame
 )
 
 # Import the generated UI class from ui_main_window.py
@@ -42,6 +42,24 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        # 创建占位框（仅初始化时显示）
+        self.placeholder_frame = QFrame()
+        self.placeholder_frame.setMinimumWidth(200)
+        self.placeholder_frame.setFrameShape(QFrame.StyledPanel)
+        self.placeholder_frame.setStyleSheet("""
+            QFrame {{
+                background-image: url(:images/Adansonia_grandidieri04.jpg);
+                background-repeat: no-repeat;
+                background-position: center;
+                background-origin: content;
+                background-color: rgba(255, 255, 255, 120);  /* 半透明覆盖 */
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+            }}
+        """)
+        # 加入左侧 verticalLayout（树位置）
+        self.ui.verticalLayout.addWidget(self.placeholder_frame)
+
         # 绑定这个展示树状图的方法
         sm.left_tree_structure_rander_after_create_new_notebook_signal.connect(self.xp_tree_widget_)
         # 用来接收富文本框的路径
@@ -547,6 +565,8 @@ class MainWindow(QMainWindow):
     '''
     @Slot(str)
     def xp_tree_widget_(self, file_path):
+        self.ui.verticalLayout.removeWidget(self.placeholder_frame)
+        self.placeholder_frame.deleteLater()
         print(file_path)
         # 先清空 verticalLayout 中的旧组件
         self.clear_layout(self.ui.verticalLayout)
