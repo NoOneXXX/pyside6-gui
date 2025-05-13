@@ -1,0 +1,105 @@
+
+/* 全局默认字体与背景 */
+QMainWindow {
+    background-color: #2b2b2b;
+    color: #dddddd;
+    font-family: "微软雅黑", "Arial", sans-serif;
+    font-size: 14px;
+}
+
+/* 按钮样式 */
+QPushButton {
+    background-color: #3c3f41;
+    border: 1px solid #5c5f61;
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #ffffff;
+}
+QPushButton:hover {
+    background-color: #505357;
+}
+QPushButton:pressed {
+    background-color: #2b2b2b;
+}
+
+/* 输入框、文本编辑框样式 */
+QLineEdit, QTextEdit, QPlainTextEdit {
+    border: 1px solid #5c5f61;
+    border-radius: 4px;
+    background-color: #1e1e1e;
+    color: #ffffff;
+    padding: 4px;
+}
+
+/* 标签 */
+QLabel {
+    color: #dddddd;
+}
+
+/* 分隔条 */
+QSplitter::handle {
+    background-color: #444;
+    border: 1px solid #2b2b2b;
+    width: 5px;
+}
+
+/* 状态栏 */
+QStatusBar {
+    background-color: #2b2b2b;
+    color: #dddddd;
+}
+
+/* 工具栏 */
+QToolBar {
+    background-color: #313335;
+    spacing: 6px;
+}
+
+/* 菜单栏 */
+QMenuBar {
+    background-color: #313335;
+    color: #ffffff;
+}
+QMenuBar::item:selected {
+    background-color: #3a3d3f;
+}
+
+/* 菜单 */
+QMenu {
+    background-color: #2b2b2b;
+    color: #ffffff;
+    border: 1px solid #444;
+}
+QMenu::item:selected {
+    background-color: #3a3d3f;
+}
+
+/* 表格 */
+QTableView, QTreeView {
+    background-color: #2b2b2b;
+    alternate-background-color: #313335;
+    gridline-color: #444;
+    color: #ffffff;
+    selection-background-color: #555555;
+}
+
+/* 滚动条 */
+QScrollBar:vertical, QScrollBar:horizontal {
+    background: #2b2b2b;
+    border: none;
+    width: 10px;
+    margin: 0px;
+}
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+    background: #5c5f61;
+    min-height: 20px;
+    border-radius: 4px;
+}
+QScrollBar::handle:hover {
+    background: #707070;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+    background: none;
+    height: 0px;
+    width: 0px;
+}

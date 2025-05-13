@@ -585,6 +585,9 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setApplicationName("Megasolid Idiom")
     qInstallMessageHandler(qt_message_handler)
+    # 增加全局样式 虽然不是很成功 先放着 后面慢慢的调试
+    with open("gui/ui/qss/light.qss", "r", encoding="utf-8") as f:
+        app.setStyleSheet(f.read())
 
     window = MainWindow()
     window.show()

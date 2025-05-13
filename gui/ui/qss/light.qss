@@ -1,0 +1,90 @@
+
+/* === 全局 === */
+* {
+    font-family: "Segoe UI", "微软雅黑", sans-serif;
+    font-size: 14px;
+    color: #333;
+}
+
+QMainWindow {
+    background-color: #f7f7f7;
+}
+
+/* === 标签 === */
+QLabel {
+    color: #333;
+}
+
+/* === 按钮 === */
+QPushButton {
+    background-color: #e0e0e0;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 6px 12px;
+}
+QPushButton:hover {
+    background-color: #d6d6d6;
+}
+QPushButton:pressed {
+    background-color: #a0cfff;
+}
+
+/* === 输入框 === */
+QLineEdit, QTextEdit, QPlainTextEdit {
+    background-color: #ffffff;
+    border: 1px solid #bbb;
+    border-radius: 5px;
+    padding: 4px;
+    color: #000000;
+}
+
+/* === 表格与列表 === */
+QTableWidget, QTreeWidget, QListWidget {
+    background-color: #ffffff;
+    border: 1px solid #ccc;
+    alternate-background-color: #f1f1f1;
+    color: #333;
+    gridline-color: #ddd;
+}
+
+/* === 滚动条 === */
+QScrollBar:vertical, QScrollBar:horizontal {
+    background: transparent;
+    width: 10px;
+    margin: 0px;
+}
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+    background: #cccccc;
+    border-radius: 5px;
+    min-height: 20px;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+    background: none;
+}
+QScrollBar::add-page, QScrollBar::sub-page {
+    background: none;
+}
+
+/* === 菜单栏 === */
+QMenuBar {
+    background-color: #f7f7f7;
+}
+QMenuBar::item {
+    background: transparent;
+    padding: 5px 15px;
+}
+QMenuBar::item:selected {
+    background: #e0e0e0;
+}
+
+/* === 下拉框 === */
+QComboBox {
+    background-color: #ffffff;
+    border: 1px solid #ccc;
+    padding: 4px;
+    color: #333;
+}
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    selection-background-color: #a0cfff;
+}
