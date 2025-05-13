@@ -138,7 +138,9 @@ class XPNotebookTree(QWidget):
 
 def main():
     app = QApplication(sys.argv)
-    widget = XPNotebookTree("C:/Users/Dell/Desktop/temp/log")  # 替换为你自己的路径
+    # widget = XPNotebookTree("C:/Users/Dell/Desktop/temp/log")  # 替换为你自己的路径
+    #mac /Users/echo/Desktop/temp
+    widget = XPNotebookTree("/Users/echo/Desktop/temp")  # 替换为你自己的路径
     widget.resize(300, 500)
     widget.setWindowTitle(f"目录树：{widget.custom_path}")
     widget.show()
