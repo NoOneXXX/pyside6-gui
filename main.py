@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QHBoxLayout,
-    QSizePolicy, QFrame
+    QSizePolicy, QFrame, QTreeWidgetItem, QTableWidgetItem
 )
 
 # Import the generated UI class from ui_main_window.py
@@ -63,6 +63,13 @@ class MainWindow(QMainWindow):
 
         # 绑定这个展示树状图的方法
         sm.left_tree_structure_rander_after_create_new_notebook_signal.connect(self.xp_tree_widget_)
+        # 绑定又上角
+
+
+        # 可选：让列更漂亮
+        self.ui.noteTable.resizeColumnsToContents()
+        self.ui.noteTable.horizontalHeader().setStretchLastSection(True)
+
         # 用来接收富文本框的路径
         self.richtext_saved_path = None
         sm.send_current_file_path_2_main_richtext_signal.connect(self.receiver_path)
