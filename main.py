@@ -23,12 +23,13 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QHBoxLayout,
-    QSizePolicy, QFrame, QTreeWidgetItem, QTableWidgetItem
+    QSizePolicy, QFrame, QTreeWidgetItem, QTableWidgetItem, QVBoxLayout
 )
 
 # Import the generated UI class from ui_main_window.py
 from gui.ui.ui_main_window import Ui_MainWindow
 from gui.func.left.XPNotebookTree import  XPNotebookTree
+from gui.func.right_top_corner.XPTreeRightTop import XPTreeRightTop
 from gui.func.right_bottom_corner.RichTextEdit import RichTextEdit
 from gui.func.top_menu.file_action import FileActions
 from gui.func.singel_pkg.single_manager import sm
@@ -63,12 +64,24 @@ class MainWindow(QMainWindow):
 
         # 绑定这个展示树状图的方法
         sm.left_tree_structure_rander_after_create_new_notebook_signal.connect(self.xp_tree_widget_)
-        # 绑定又上角
+        # 绑定又上角-------------------------------------------
+        # 设置 layout，如果没有则添加
+        if self.ui.noteTreeContainer.layout() is None:
+            self.layout = QVBoxLayout(self.ui.noteTreeContainer)
+        else:
+            self.layout = self.ui.noteTreeContainer.layout()
 
+        # 清除旧内容
+        for i in reversed(range(self.layout.count())):
+            item = self.layout.itemAt(i)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
 
-        # 可选：让列更漂亮
-        self.ui.noteTable.resizeColumnsToContents()
-        self.ui.noteTable.horizontalHeader().setStretchLastSection(True)
+        # 加载 XPNotebookTree
+        tree = XPTreeRightTop("")
+        self.layout.addWidget(tree)
+        # 绑定又上角-----------------结束--------------------------
 
         # 用来接收富文本框的路径
         self.richtext_saved_path = None
@@ -407,7 +420,7 @@ class MainWindow(QMainWindow):
             with open(self.richtext_saved_path, "w", encoding="utf-8") as f:
                 f.write(html_content)
 
-            # ✅ 最关键：重新注册文档中图片资源，确保编辑时能继续显示
+            #  最关键：重新注册文档中图片资源，确保编辑时能继续显示
             for src in src_list:
                 src = src.strip()
                 img_path = os.path.join(base_dir, src)
@@ -582,6 +595,8 @@ class MainWindow(QMainWindow):
 
         self.ui.verticalLayout.addWidget(tree_widget)
 
+
+
     def clear_layout(self, layout):
         while layout.count():
             item = layout.takeAt(0)
@@ -606,8 +621,19 @@ class MainWindow(QMainWindow):
     '''
     @Slot(str)
     def receiver_path(self,path_):
-        print(f'------->{path_}')
         self.richtext_saved_path = path_
+        print('------------------->', self.richtext_saved_path)
+        # 右上角的数据渲染
+        # 获取父目录
+        parent_dir = os.path.dirname(path_)
+        parent_p_dir = os.path.dirname(parent_dir)
+        print('父目录路径：', parent_dir)
+        # 清空 noteTreeContainer 中旧的 XPNotebookTree（右上角）
+        self.clear_layout(self.layout)
+        tree = XPTreeRightTop(parent_p_dir)
+        self.layout.addWidget(tree)
+
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

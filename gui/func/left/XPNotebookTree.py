@@ -448,4 +448,4 @@ if __name__ == "__main__":
 
     print(QtCore.QFile.exists(":images/grandidier.jpg"))
 
-    # main()
+    main()

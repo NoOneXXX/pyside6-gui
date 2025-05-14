@@ -25,5 +25,6 @@
     <file alias="trash.png">../images/tree/trash.png</file>
     <file alias="open.png">../images/tree/open.png</file>
     <file alias="grandidier.jpg">../images/tree/grandidier.jpg</file>
+    <file alias="note-violet.png">../images/tree/note-violet.png</file>
   </qresource>
 </RCC>
