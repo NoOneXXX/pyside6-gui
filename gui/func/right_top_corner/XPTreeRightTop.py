@@ -20,9 +20,10 @@ def format_time(ts):
     return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
 
 class XPTreeRightTop(QWidget):
-    def __init__(self, path, rich_text_edit=None, parent=None):
+    def __init__(self, path, selected_path=None, rich_text_edit=None, parent=None):
         super().__init__(parent)
         self.custom_path = os.path.expanduser(path)
+        self.selected_path = os.path.expanduser(selected_path) if selected_path else None
         self.rich_text_edit = rich_text_edit
 
         self.folder_closed_icon = QIcon(QPixmap(":images/folder-orange.png"))
@@ -79,9 +80,9 @@ class XPTreeRightTop(QWidget):
         self.tree.setColumnCount(3)
         self.tree.setHeaderLabels(["Context", "Created Time", "Updated Time"])
 
-        # 使所有列都可拖动，并撑满区域
         self.tree.header().setStretchLastSection(True)
         self.tree.header().setSectionResizeMode(0, QHeaderView.Interactive)
+        self.tree.setColumnWidth(0, 300)  # 设置第一列宽度
         self.tree.header().setSectionResizeMode(1, QHeaderView.Interactive)
         self.tree.header().setSectionResizeMode(2, QHeaderView.Interactive)
 
@@ -114,10 +115,32 @@ class XPTreeRightTop(QWidget):
             root.setFont(0, font)
             root.setData(0, Qt.UserRole, self.custom_path)
             root.addChild(QTreeWidgetItem())
-
+            root.setExpanded(True)
 
         self.tree.setAnimated(True)
         self.tree.setExpandsOnDoubleClick(False)
+
+        if self.selected_path:
+            self.select_item_by_path(self.selected_path)
+
+    def select_item_by_path(self, target_path):
+        def recurse(parent):
+            for i in range(parent.childCount()):
+                item = parent.child(i)
+                item_path = item.data(0, Qt.UserRole)
+                if item_path == target_path:
+                    self.tree.setCurrentItem(item)
+                    self.tree.scrollToItem(item)
+                    return True
+                if recurse(item):
+                    item.setExpanded(True)
+                    return True
+            return False
+
+        for i in range(self.tree.topLevelItemCount()):
+            top_item = self.tree.topLevelItem(i)
+            if recurse(top_item):
+                break
 
     def handle_item_expanded(self, item):
         path = item.data(0, Qt.UserRole)
@@ -176,7 +199,8 @@ QMenu::icon {
 
 def main():
     app = QApplication(sys.argv)
-    widget = XPTreeRightTop("C:/Users/Dell/Desktop/temp/log")
+    # 示例：选中某个文件
+    widget = XPTreeRightTop("C:/Users/Dell/Desktop/temp/log", selected_path="C:/Users/Dell/Desktop/temp/log/文件1.html")
     widget.resize(600, 500)
     widget.setWindowTitle(f"目录树：{widget.custom_path}")
     widget.show()
