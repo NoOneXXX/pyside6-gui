@@ -37,8 +37,6 @@ class XPNotebookTree(QWidget):
                 editor = JsonEditor()
                 content_type = editor.read_notebook_if_dir(full_path)
 
-                print(f"[populate_tree] {name} => content_type={content_type}")
-
                 if 'dir' == content_type:
                     folder_item = QTreeWidgetItem(parent_item)
                     folder_item.setText(0, name)
@@ -163,7 +161,6 @@ class XPNotebookTree(QWidget):
     '''
     左键点击的方法实现
     '''
-
     def on_item_clicked(self, item):
         # 这个是在点击的时候将树状图给展开和合并
         if item.childCount() > 0:
@@ -175,7 +172,6 @@ class XPNotebookTree(QWidget):
                 self.handle_item_expanded(item)
 
         file_path = item.data(0, Qt.UserRole)
-        print("点击的文件路径是：", file_path)
 
         editor = JsonEditor()
         content_type = editor.read_notebook_if_dir(file_path)
@@ -191,34 +187,6 @@ class XPNotebookTree(QWidget):
 
             # 设置内容
             self.rich_text_edit.setHtml(html)
-
-    # def on_item_clicked(self, item, column):
-    #     if item.childCount() > 0:
-    #         if item.isExpanded():
-    #             item.setExpanded(False)
-    #             self.handle_item_collapsed(item)
-    #         else:
-    #             item.setExpanded(True)
-    #             self.handle_item_expanded(item)
-    #
-    #     # 额外添加：如果是文件，读取 HTML 内容显示到富文本
-    #     path = item.data(0, Qt.UserRole)
-    #     editor = JsonEditor()
-    #     content_type = editor.read_notebook_if_dir(path)
-    #     if content_type == "file" and self.rich_text_edit:
-    #         html_path = os.path.join(path, ".note.html")
-    #         # 将这个路径发送到 main 用来给富文本保存文件内容使用
-    #         sm.send_current_file_path_2_main_richtext_signal.emit(html_path)
-    #         if os.path.exists(html_path):
-    #             with open(html_path, "r", encoding="utf-8") as f:
-    #                 html_content = f.read()
-    #                 # Load HTML into rich text editor
-    #                 self.rich_text_edit.setHtml(html_content)
-
-
-
-
-
 
     '''
     右键点击事件的方法

@@ -5,6 +5,9 @@ from PySide6.QtWidgets import QTextEdit
 from PySide6.QtGui import QImage, QClipboard
 from PySide6.QtCore import QMimeData, QBuffer, QByteArray
 
+''''
+富文本类设置
+'''
 class RichTextEdit(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -39,14 +42,11 @@ class RichTextEdit(QTextEdit):
         try:
             if not self.html_file_path:
                 return
-
             html = self.toHtml()
             html_dir = os.path.dirname(self.html_file_path)
-
             pattern = re.compile(
                 r'<img[^>]+src="data:image/(?P<ext>png|jpg|jpeg);base64,(?P<data>[A-Za-z0-9+/=]{100,})"'
             )
-
             counter = 0
 
             def repl(match):
