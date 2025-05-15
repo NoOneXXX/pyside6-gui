@@ -37,7 +37,7 @@ try:
     import sip
 except ImportError:
     sip = None
-
+from gui.func.under_top_menu.color_picker import RichTextColor
 # Custom Qt message handler for debugging
 def qt_message_handler(msg_type: QtMsgType, context, msg: str):
     print(f"Qt Message [{msg_type}]: {msg} ({context.file}:{context.line})")
@@ -277,6 +277,13 @@ class MainWindow(QMainWindow):
         format_toolbar.addAction(self.underline_action)
         format_menu.addAction(self.underline_action)
 
+        '''颜色选择 '''
+        self.rtc = RichTextColor(self.rich_text_editor)
+        color_action = self.rtc.color_picker_action(self)
+        format_toolbar.addAction(color_action)
+        format_menu.addAction(color_action)
+
+
         format_menu.addSeparator()
 
         self.alignl_action = QAction(
@@ -395,14 +402,15 @@ class MainWindow(QMainWindow):
     '''
     修改了富文本的内容 就自动的保存
     '''
-
     def auto_save_note(self):
         """Auto-save note and ensure all inserted images are saved and displayable."""
         #
-        self.rich_text_editor.html_file_path = self.richtext_saved_path
-        self.rich_text_editor.clean_base64_images()
-        with open(self.richtext_saved_path, 'w', encoding='utf-8') as f:
-            f.write(self.rich_text_editor.toHtml())
+        print(self.richtext_saved_path)
+        if self.richtext_saved_path is not None:
+            self.rich_text_editor.html_file_path = self.richtext_saved_path
+            self.rich_text_editor.clean_base64_images()
+            with open(self.richtext_saved_path, 'w', encoding='utf-8') as f:
+                f.write(self.rich_text_editor.toHtml())
 
 
 
@@ -597,7 +605,6 @@ class MainWindow(QMainWindow):
         self.ui.verticalSplitter.setSizes([215, self.height() - 215])
     '''
     富文本框的路径接收
-    
     '''
     @Slot(str)
     def receiver_path(self,path_):
@@ -612,6 +619,7 @@ class MainWindow(QMainWindow):
         self.clear_layout(self.layout)
         tree = XPTreeRightTop(parent_p_dir)
         self.layout.addWidget(tree)
+
 
 
 
