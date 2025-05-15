@@ -1,7 +1,10 @@
 ## 使用这个命令将ui文件转换成py文件 只有转换了这个文件 pyside6才能识别 否则就无法识别不能加载
 
 ```shell
+-- window的命令
 pyside6-uic .\pyside6-mainwindow.ui -o ui_main_window.py
+-- mac/linux 
+pyside6-uic pyside6-mainwindow.ui -o ui_main_window.py
 ```
 
 ## 将qrc文件打包成py文件

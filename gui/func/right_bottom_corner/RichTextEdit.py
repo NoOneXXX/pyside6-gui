@@ -1,67 +1,76 @@
 import os
-
-from PySide6.QtCore import QUrl
-from PySide6.QtGui import QFont, QTextDocument, QImage
+import re
+import base64
 from PySide6.QtWidgets import QTextEdit
+from PySide6.QtGui import QImage, QClipboard
+from PySide6.QtCore import QMimeData, QBuffer, QByteArray
 
-# 富文本框
 class RichTextEdit(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAutoFormatting(QTextEdit.AutoFormattingFlag.AutoAll)
-        font = QFont("Times", 20)
-        self.setFont(font)
-        self.setFontPointSize(20)
+        self.html_file_path = None  # 必须外部设置
+        self._cleaning_base64 = False
 
-    def insertFromMimeData(self, source):
-        """Handle paste events to support images from clipboard."""
-        cursor = self.textCursor()
-        document = self.document()
-
+    def insertFromMimeData(self, source: QMimeData):
         if source.hasImage():
             image = source.imageData()
-            if image.isNull():
-                super().insertFromMimeData(source)
-                return
+            if isinstance(image, QImage):
+                # 保存图片
+                if not self.html_file_path:
+                    print("请先设置 html_file_path")
+                    return
 
-            image_name = f"image_{id(image)}.png"
-            document.addResource(QTextDocument.ImageResource, QUrl(image_name), image)
-            cursor.insertImage(image_name)
-            self.setTextCursor(cursor)
-        elif source.hasUrls():
-            for u in source.urls():
-                file_ext = os.path.splitext(str(u.toLocalFile()))[1].lower()
-                if u.isLocalFile() and file_ext in ['.png', '.jpg', '.jpeg', '.gif', '.bmp']:
-                    image = QImage(u.toLocalFile())
-                    document.addResource(QTextDocument.ImageResource, u, image)
-                    cursor.insertImage(u.toLocalFile())
-                else:
-                    break
-            else:
-                return
+                html_dir = os.path.dirname(self.html_file_path)
+                img_name = f"pasted_img_{len(os.listdir(html_dir))}.png"
+                img_path = os.path.join(html_dir, img_name)
+                image.save(img_path)
+
+                # 插入图片使用相对路径
+                self.textCursor().insertHtml(f'<img src="{img_name}">')
         else:
+            # 默认行为处理文本或其他
             super().insertFromMimeData(source)
 
-    def canInsertFromMimeData(self, source):
-        if source.hasImage() or source.hasUrls():
-            return True
-        return super().canInsertFromMimeData(source)
- # 右键鼠标点击事件
-    def contextMenuEvent(self, event):
-        """Customize the context menu to fix text shadow issue."""
-        menu = self.createStandardContextMenu()
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: white;
-                color: black;
-                border: 1px solid #CCCCCC;
-            }
-            QMenu::item {
-                background-color: transparent;
-                padding: 5px 20px;
-            }
-            QMenu::item:selected {
-                background-color: #E0E0E0;
-            }
-        """)
-        menu.exec(event.globalPos())
+    def clean_base64_images(self):
+        if self._cleaning_base64:
+            return
+        self._cleaning_base64 = True
+
+        try:
+            if not self.html_file_path:
+                return
+
+            html = self.toHtml()
+            html_dir = os.path.dirname(self.html_file_path)
+
+            pattern = re.compile(
+                r'<img[^>]+src="data:image/(?P<ext>png|jpg|jpeg);base64,(?P<data>[A-Za-z0-9+/=]{100,})"'
+            )
+
+            counter = 0
+
+            def repl(match):
+                nonlocal counter
+                ext = match.group("ext")
+                data = match.group("data")
+
+                filename = f"pasted_img_{counter}.{ext}"
+                file_path = os.path.join(html_dir, filename)
+
+                with open(file_path, "wb") as f:
+                    f.write(base64.b64decode(data))
+
+                counter += 1
+                return f'<img src="{filename}"'
+
+            new_html = pattern.sub(repl, html)
+
+            #  关键：避免 setHtml 再次触发 clean_base64_images
+            if new_html != html:
+                self.blockSignals(True)
+                self.setHtml(new_html)
+                self.blockSignals(False)
+
+        finally:
+            self._cleaning_base64 = False
+

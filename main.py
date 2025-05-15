@@ -6,7 +6,7 @@ import sys
 # 这个文件的引用不能删除 否则下面的图片就会找不到文件
 from gui.ui import resource_rc
 
-from PySide6.QtCore import QSize, Qt, QtMsgType, qInstallMessageHandler, Slot, QUrl
+from PySide6.QtCore import QSize, Qt, QtMsgType, qInstallMessageHandler, Slot, QUrl, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QFont, QIcon, QKeySequence, QTextCharFormat, QTextDocument, QImage
 from PySide6.QtPrintSupport import QPrintDialog
 from PySide6.QtWidgets import (
@@ -28,11 +28,16 @@ from PySide6.QtWidgets import (
 
 # Import the generated UI class from ui_main_window.py
 from gui.ui.ui_main_window import Ui_MainWindow
-from gui.func.left.XPNotebookTree import  XPNotebookTree
+from gui.func.left.XPNotebookTree import XPNotebookTree
 from gui.func.right_top_corner.XPTreeRightTop import XPTreeRightTop
 from gui.func.right_bottom_corner.RichTextEdit import RichTextEdit
 from gui.func.top_menu.file_action import FileActions
 from gui.func.singel_pkg.single_manager import sm
+try:
+    import sip
+except ImportError:
+    sip = None
+
 # Custom Qt message handler for debugging
 def qt_message_handler(msg_type: QtMsgType, context, msg: str):
     print(f"Qt Message [{msg_type}]: {msg} ({context.file}:{context.line})")
@@ -88,13 +93,13 @@ class MainWindow(QMainWindow):
         sm.send_current_file_path_2_main_richtext_signal.connect(self.receiver_path)
         # Create editor using RichTextEdit
         # 富文本框
-        self.editor = RichTextEdit(self)
+        self.rich_text_editor = RichTextEdit(self)
         # 监听文件改动 只要文件改动就进行保存
-        self.editor.textChanged.connect(self.auto_save_note)
-        self.editor.selectionChanged.connect(self.update_format)
+        self.rich_text_editor.textChanged.connect(self.auto_save_note)
+        self.rich_text_editor.selectionChanged.connect(self.update_format)
 
         # Add editor to noteContentTable
-        self.ui.noteContentTable.setCellWidget(0, 0, self.editor)
+        self.ui.noteContentTable.setCellWidget(0, 0, self.rich_text_editor)
 
         # Adjust table size
         self.ui.noteContentTable.setRowHeight(0, self.ui.noteContentTable.height())
@@ -153,7 +158,7 @@ class MainWindow(QMainWindow):
             self,
         )
         undo_action.setStatusTip("Undo last change")
-        undo_action.triggered.connect(self.editor.undo)
+        undo_action.triggered.connect(self.rich_text_editor.undo)
         edit_menu.addAction(undo_action)
 
         redo_action = QAction(
@@ -162,7 +167,7 @@ class MainWindow(QMainWindow):
             self,
         )
         redo_action.setStatusTip("Redo last change")
-        redo_action.triggered.connect(self.editor.redo)
+        redo_action.triggered.connect(self.rich_text_editor.redo)
         edit_toolbar.addAction(redo_action)
         edit_menu.addAction(redo_action)
 
@@ -171,7 +176,7 @@ class MainWindow(QMainWindow):
         cut_action = QAction(QIcon(":/images/scissors.png"), "Cut", self)
         cut_action.setStatusTip("Cut selected text")
         cut_action.setShortcut(QKeySequence.StandardKey.Cut)
-        cut_action.triggered.connect(self.editor.cut)
+        cut_action.triggered.connect(self.rich_text_editor.cut)
         edit_toolbar.addAction(cut_action)
         edit_menu.addAction(cut_action)
 
@@ -182,7 +187,7 @@ class MainWindow(QMainWindow):
         )
         copy_action.setStatusTip("Copy selected text")
         copy_action.setShortcut(QKeySequence.StandardKey.Copy)
-        copy_action.triggered.connect(self.editor.copy)
+        copy_action.triggered.connect(self.rich_text_editor.copy)
         edit_toolbar.addAction(copy_action)
         edit_menu.addAction(copy_action)
 
@@ -193,7 +198,7 @@ class MainWindow(QMainWindow):
         )
         paste_action.setStatusTip("Paste from clipboard")
         paste_action.setShortcut(QKeySequence.StandardKey.Paste)
-        paste_action.triggered.connect(self.editor.paste)
+        paste_action.triggered.connect(self.rich_text_editor.paste)
         edit_toolbar.addAction(paste_action)
         edit_menu.addAction(paste_action)
 
@@ -204,7 +209,7 @@ class MainWindow(QMainWindow):
         )
         select_action.setStatusTip("Select all text")
         select_action.setShortcut(QKeySequence.StandardKey.SelectAll)
-        select_action.triggered.connect(self.editor.selectAll)
+        select_action.triggered.connect(self.rich_text_editor.selectAll)
         edit_menu.addAction(select_action)
 
         edit_menu.addSeparator()
@@ -226,7 +231,7 @@ class MainWindow(QMainWindow):
         format_menu = self.menuBar().addMenu("&Format")
 
         self.fonts = QFontComboBox()
-        self.fonts.currentFontChanged.connect(self.editor.setCurrentFont)
+        self.fonts.currentFontChanged.connect(self.rich_text_editor.setCurrentFont)
         format_toolbar.addWidget(self.fonts)
 
         # Define font sizes locally since constants.FONT_SIZES is unavailable
@@ -234,7 +239,7 @@ class MainWindow(QMainWindow):
         self.fontsize = QComboBox()
         self.fontsize.addItems([str(s) for s in FONT_SIZES])
         self.fontsize.currentTextChanged.connect(
-            lambda s: self.editor.setFontPointSize(float(s))
+            lambda s: self.rich_text_editor.setFontPointSize(float(s))
         )
         format_toolbar.addWidget(self.fontsize)
 
@@ -282,7 +287,7 @@ class MainWindow(QMainWindow):
         self.alignl_action.setStatusTip("Align text left")
         self.alignl_action.setCheckable(True)
         self.alignl_action.triggered.connect(
-            lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignLeft)
+            lambda: self.rich_text_editor.setAlignment(Qt.AlignmentFlag.AlignLeft)
         )
         format_toolbar.addAction(self.alignl_action)
         format_menu.addAction(self.alignl_action)
@@ -295,7 +300,7 @@ class MainWindow(QMainWindow):
         self.alignc_action.setStatusTip("Align text center")
         self.alignc_action.setCheckable(True)
         self.alignc_action.triggered.connect(
-            lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lambda: self.rich_text_editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
         )
         format_toolbar.addAction(self.alignc_action)
         format_menu.addAction(self.alignc_action)
@@ -308,7 +313,7 @@ class MainWindow(QMainWindow):
         self.alignr_action.setStatusTip("Align text right")
         self.alignr_action.setCheckable(True)
         self.alignr_action.triggered.connect(
-            lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignRight)
+            lambda: self.rich_text_editor.setAlignment(Qt.AlignmentFlag.AlignRight)
         )
         format_toolbar.addAction(self.alignr_action)
         format_menu.addAction(self.alignr_action)
@@ -321,7 +326,7 @@ class MainWindow(QMainWindow):
         self.alignj_action.setStatusTip("Justify text")
         self.alignj_action.setCheckable(True)
         self.alignj_action.triggered.connect(
-            lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignJustify)
+            lambda: self.rich_text_editor.setAlignment(Qt.AlignmentFlag.AlignJustify)
         )
         format_toolbar.addAction(self.alignj_action)
         format_menu.addAction(self.alignj_action)
@@ -366,24 +371,24 @@ class MainWindow(QMainWindow):
     def update_format(self):
         self.block_signals(self._format_actions, True)
 
-        self.fonts.setCurrentFont(self.editor.currentFont())
-        self.fontsize.setCurrentText(str(int(self.editor.fontPointSize())))
+        self.fonts.setCurrentFont(self.rich_text_editor.currentFont())
+        self.fontsize.setCurrentText(str(int(self.rich_text_editor.fontPointSize())))
 
-        self.italic_action.setChecked(self.editor.fontItalic())
-        self.underline_action.setChecked(self.editor.fontUnderline())
-        self.bold_action.setChecked(self.editor.fontWeight() == QFont.Weight.Bold)
+        self.italic_action.setChecked(self.rich_text_editor.fontItalic())
+        self.underline_action.setChecked(self.rich_text_editor.fontUnderline())
+        self.bold_action.setChecked(self.rich_text_editor.fontWeight() == QFont.Weight.Bold)
 
         self.alignl_action.setChecked(
-            self.editor.alignment() == Qt.AlignmentFlag.AlignLeft
+            self.rich_text_editor.alignment() == Qt.AlignmentFlag.AlignLeft
         )
         self.alignc_action.setChecked(
-            self.editor.alignment() == Qt.AlignmentFlag.AlignCenter
+            self.rich_text_editor.alignment() == Qt.AlignmentFlag.AlignCenter
         )
         self.alignr_action.setChecked(
-            self.editor.alignment() == Qt.AlignmentFlag.AlignRight
+            self.rich_text_editor.alignment() == Qt.AlignmentFlag.AlignRight
         )
         self.alignj_action.setChecked(
-            self.editor.alignment() == Qt.AlignmentFlag.AlignJustify
+            self.rich_text_editor.alignment() == Qt.AlignmentFlag.AlignJustify
         )
 
         self.block_signals(self._format_actions, False)
@@ -393,47 +398,13 @@ class MainWindow(QMainWindow):
 
     def auto_save_note(self):
         """Auto-save note and ensure all inserted images are saved and displayable."""
-        if not self.richtext_saved_path:
-            return
+        #
+        self.rich_text_editor.html_file_path = self.richtext_saved_path
+        self.rich_text_editor.clean_base64_images()
+        with open(self.richtext_saved_path, 'w', encoding='utf-8') as f:
+            f.write(self.rich_text_editor.toHtml())
 
-        try:
-            doc = self.editor.document()
-            html_content = self.editor.toHtml()
-            base_dir = os.path.dirname(self.richtext_saved_path)
 
-            # 匹配所有 <img src="xxx.png">
-            pattern = re.compile(r'<img[^>]+src="([^"]+)"')
-            src_list = pattern.findall(html_content)
-
-            for src in src_list:
-                src = src.strip()
-                img_path = os.path.join(base_dir, src)
-
-                # 如果图片不存在于磁盘，尝试从 document 中提取资源写入
-                if not os.path.exists(img_path):
-                    image = doc.resource(QTextDocument.ImageResource, QUrl(src))
-                    if isinstance(image, QImage) and not image.isNull():
-                        image.save(img_path, "PNG")
-                        print(f"[Auto Save] 保存图片: {img_path}")
-
-            # 保存 HTML（保持 src="xxx.png" 不做替换）
-            with open(self.richtext_saved_path, "w", encoding="utf-8") as f:
-                f.write(html_content)
-
-            #  最关键：重新注册文档中图片资源，确保编辑时能继续显示
-            for src in src_list:
-                src = src.strip()
-                img_path = os.path.join(base_dir, src)
-                if os.path.exists(img_path):
-                    image = QImage(img_path)
-                    if not image.isNull():
-                        doc.addResource(QTextDocument.ImageResource, QUrl(src), image)
-                        print(f"[Auto Save] 注册图片资源: {src}")
-
-            print(f"[Auto Save] HTML 和图片保存完成: {self.richtext_saved_path}")
-
-        except Exception as e:
-            print(f"[Auto Save Failed] {e}")
 
     def dialog_critical(self, s):
         dlg = QMessageBox(self)
@@ -458,7 +429,7 @@ class MainWindow(QMainWindow):
 
         else:
             self.path = path
-            self.editor.setText(text)
+            self.rich_text_editor.setText(text)
             self.update_title()
 
     def file_save(self):
@@ -466,9 +437,9 @@ class MainWindow(QMainWindow):
             return self.file_saveas()
 
         text = (
-            self.editor.toHtml()
+            self.rich_text_editor.toHtml()
             if os.path.splitext(self.path)[1].lower() in ['.html', '.htm']
-            else self.editor.toPlainText()
+            else self.rich_text_editor.toPlainText()
         )
 
         try:
@@ -490,9 +461,9 @@ class MainWindow(QMainWindow):
             return
 
         text = (
-            self.editor.toHtml()
+            self.rich_text_editor.toHtml()
             if os.path.splitext(path)[1].lower() in ['.html', '.htm']
-            else self.editor.toPlainText()
+            else self.rich_text_editor.toPlainText()
         )
 
         try:
@@ -509,7 +480,7 @@ class MainWindow(QMainWindow):
     def file_print(self):
         dlg = QPrintDialog()
         if dlg.exec():
-            self.editor.print_(dlg.printer())
+            self.rich_text_editor.print_(dlg.printer())
 
     def update_title(self):
         self.setWindowTitle(
@@ -518,11 +489,11 @@ class MainWindow(QMainWindow):
         )
 
     def edit_toggle_wrap(self):
-        self.editor.setLineWrapMode(1 if self.editor.lineWrapMode() == 0 else 0)
+        self.rich_text_editor.setLineWrapMode(1 if self.rich_text_editor.lineWrapMode() == 0 else 0)
 
     def toggle_bold(self):
         """Toggle bold formatting for selected text."""
-        cursor = self.editor.textCursor()
+        cursor = self.rich_text_editor.textCursor()
         if not cursor.hasSelection():
             return
 
@@ -530,11 +501,11 @@ class MainWindow(QMainWindow):
         weight = QFont.Bold if not cursor.charFormat().font().bold() else QFont.Normal
         fmt.setFontWeight(weight)
         cursor.mergeCharFormat(fmt)
-        self.editor.setTextCursor(cursor)
+        self.rich_text_editor.setTextCursor(cursor)
 
     def toggle_italic(self):
         """Toggle italic formatting for selected text."""
-        cursor = self.editor.textCursor()
+        cursor = self.rich_text_editor.textCursor()
         if not cursor.hasSelection():
             return
 
@@ -542,11 +513,11 @@ class MainWindow(QMainWindow):
         italic = not cursor.charFormat().fontItalic()
         fmt.setFontItalic(italic)
         cursor.mergeCharFormat(fmt)
-        self.editor.setTextCursor(cursor)
+        self.rich_text_editor.setTextCursor(cursor)
 
     def toggle_underline(self):
         """Toggle underline formatting for selected text."""
-        cursor = self.editor.textCursor()
+        cursor = self.rich_text_editor.textCursor()
         if not cursor.hasSelection():
             return
 
@@ -554,11 +525,11 @@ class MainWindow(QMainWindow):
         underline = not cursor.charFormat().fontUnderline()
         fmt.setFontUnderline(underline)
         cursor.mergeCharFormat(fmt)
-        self.editor.setTextCursor(cursor)
+        self.rich_text_editor.setTextCursor(cursor)
 
     def change_text_color(self):
         """Change the color of selected text."""
-        cursor = self.editor.textCursor()
+        cursor = self.rich_text_editor.textCursor()
         if not cursor.hasSelection():
             return
 
@@ -567,7 +538,7 @@ class MainWindow(QMainWindow):
             fmt = QTextCharFormat()
             fmt.setForeground(color)
             cursor.mergeCharFormat(fmt)
-            self.editor.setTextCursor(cursor)
+            self.rich_text_editor.setTextCursor(cursor)
 
     def search_text(self):
         """Search for text in the editor."""
@@ -575,9 +546,9 @@ class MainWindow(QMainWindow):
         if not search_text:
             return
 
-        cursor = self.editor.document().find(search_text, self.editor.textCursor())
+        cursor = self.rich_text_editor.document().find(search_text, self.rich_text_editor.textCursor())
         if not cursor.isNull():
-            self.editor.setTextCursor(cursor)
+            self.rich_text_editor.setTextCursor(cursor)
         else:
             self.status.showMessage("Text not found", 5000)
 
@@ -586,12 +557,21 @@ class MainWindow(QMainWindow):
     '''
     @Slot(str)
     def xp_tree_widget_(self, file_path):
-        self.ui.verticalLayout.removeWidget(self.placeholder_frame)
-        self.placeholder_frame.deleteLater()
+        if self.placeholder_frame is not None:
+            try:
+                self.ui.verticalLayout.removeWidget(self.placeholder_frame)
+                self.placeholder_frame.setParent(None)
+                self.placeholder_frame.deleteLater()
+            except RuntimeError:
+                print("placeholder_frame 已被 Qt 删除，跳过")
+            self.placeholder_frame = None
+
+        # self.ui.verticalLayout.removeWidget(self.placeholder_frame)
+        # self.placeholder_frame.deleteLater()
         print(file_path)
         # 先清空 verticalLayout 中的旧组件
         self.clear_layout(self.ui.verticalLayout)
-        tree_widget = XPNotebookTree(file_path, rich_text_edit=self.editor)
+        tree_widget = XPNotebookTree(file_path, rich_text_edit=self.rich_text_editor)
 
         self.ui.verticalLayout.addWidget(tree_widget)
 

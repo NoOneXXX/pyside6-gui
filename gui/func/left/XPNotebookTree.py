@@ -164,7 +164,8 @@ class XPNotebookTree(QWidget):
     左键点击的方法实现
     '''
 
-    def on_item_clicked(self, item, column):
+    def on_item_clicked(self, item):
+        # 这个是在点击的时候将树状图给展开和合并
         if item.childCount() > 0:
             if item.isExpanded():
                 item.setExpanded(False)
@@ -173,42 +174,50 @@ class XPNotebookTree(QWidget):
                 item.setExpanded(True)
                 self.handle_item_expanded(item)
 
-        # 额外添加：如果是文件，读取 HTML 内容显示到富文本
-        path = item.data(0, Qt.UserRole)
+        file_path = item.data(0, Qt.UserRole)
+        print("点击的文件路径是：", file_path)
+
         editor = JsonEditor()
-        content_type = editor.read_notebook_if_dir(path)
+        content_type = editor.read_notebook_if_dir(file_path)
         if content_type == "file" and self.rich_text_edit:
-            html_path = os.path.join(path, ".note.html")
-            # 将这个路径发送到 main 用来给富文本保存文件内容使用
-            sm.send_current_file_path_2_main_richtext_signal.emit(html_path)
-            if os.path.exists(html_path):
-                with open(html_path, "r", encoding="utf-8") as f:
-                    html_content = f.read()
-                    # Load HTML into rich text editor
-                    self.rich_text_edit.setHtml(html_content)
+            file_path = os.path.join(file_path, ".note.html")
+            # 这个是发送地址给main那边 在那边自动保存的时候使用
+            sm.send_current_file_path_2_main_richtext_signal.emit(file_path)
+            with open(file_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            # 必须先设置 baseUrl
+            base_url = QUrl.fromLocalFile(os.path.dirname(file_path) + os.sep)
+            self.rich_text_edit.document().setBaseUrl(base_url)
 
-                    # Set base URL for resolving relative paths
-                    base_dir = os.path.dirname(html_path)
-                    base_url = QUrl.fromLocalFile(base_dir + "/")  # Use forward slash for consistency
-                    self.rich_text_edit.document().setBaseUrl(base_url)
+            # 设置内容
+            self.rich_text_edit.setHtml(html)
 
-                    # Extract and register image resources
-                    pattern = re.compile(r'<img[^>]+src="([^"]+)"')
-                    src_list = pattern.findall(html_content)
-                    doc = self.rich_text_edit.document()
-                    for src in src_list:
-                        src = src.strip()
-                        img_path = os.path.normpath(os.path.join(base_dir, src))
-                        img_url = QUrl.fromLocalFile(img_path)
-                        if os.path.exists(img_path):
-                            image = QImage(img_path)
-                            if not image.isNull():
-                                doc.addResource(QTextDocument.ImageResource, img_url, image)
-                                print(f"[Debug] Registered image resource: {img_url.toString()}")
-                            else:
-                                print(f"[Warning] Failed to load image: {img_path}")
-                        else:
-                            print(f"[Warning] Image file not found: {img_path}")
+    # def on_item_clicked(self, item, column):
+    #     if item.childCount() > 0:
+    #         if item.isExpanded():
+    #             item.setExpanded(False)
+    #             self.handle_item_collapsed(item)
+    #         else:
+    #             item.setExpanded(True)
+    #             self.handle_item_expanded(item)
+    #
+    #     # 额外添加：如果是文件，读取 HTML 内容显示到富文本
+    #     path = item.data(0, Qt.UserRole)
+    #     editor = JsonEditor()
+    #     content_type = editor.read_notebook_if_dir(path)
+    #     if content_type == "file" and self.rich_text_edit:
+    #         html_path = os.path.join(path, ".note.html")
+    #         # 将这个路径发送到 main 用来给富文本保存文件内容使用
+    #         sm.send_current_file_path_2_main_richtext_signal.emit(html_path)
+    #         if os.path.exists(html_path):
+    #             with open(html_path, "r", encoding="utf-8") as f:
+    #                 html_content = f.read()
+    #                 # Load HTML into rich text editor
+    #                 self.rich_text_edit.setHtml(html_content)
+
+
+
+
 
 
     '''

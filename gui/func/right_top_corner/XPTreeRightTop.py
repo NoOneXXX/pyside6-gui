@@ -16,8 +16,10 @@ from gui.func.utils.json_utils import JsonEditor
 from gui.func.utils.tools_utils import read_parent_id, create_metadata_file_under_dir, create_metadata_dir_under_dir
 from gui.func.left.CustomTreeItemDelegate import CustomTreeItemDelegate
 
+
 def format_time(ts):
     return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+
 
 class XPTreeRightTop(QWidget):
     def __init__(self, path, selected_path=None, rich_text_edit=None, parent=None):
@@ -32,6 +34,12 @@ class XPTreeRightTop(QWidget):
 
         self.tree = None
         self.setup_ui()
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(100, lambda: self.select_path_item(self.selected_path)) if self.selected_path else None
+
+        # 确保 tree 已初始化和填充
+        if self.selected_path:
+            self.select_path_item(self.selected_path)
 
     def populate_tree(self, parent_item, path):
         try:
@@ -84,11 +92,13 @@ class XPTreeRightTop(QWidget):
         self.tree.header().setSectionResizeMode(0, QHeaderView.Interactive)
         self.tree.setColumnWidth(0, 300)  # 设置第一列宽度
         self.tree.header().setSectionResizeMode(1, QHeaderView.Interactive)
+        self.tree.setColumnWidth(1, 250)  # 设置第二列宽度
         self.tree.header().setSectionResizeMode(2, QHeaderView.Interactive)
 
         style = QStyleFactory.create("Fusion")
         if style:
             self.tree.setStyle(style)
+
         palette = self.tree.palette()
         palette.setColor(QPalette.Highlight, QColor("#E6F0FA"))
         palette.setColor(QPalette.HighlightedText, QColor("#000000"))
@@ -167,6 +177,21 @@ class XPTreeRightTop(QWidget):
         else:
             item.setIcon(0, QIcon())
 
+    def select_path_item(self, path):
+        def recursive_search(item):
+            for i in range(item.childCount()):
+                child = item.child(i)
+                if child.data(0, Qt.UserRole) == path:
+                    self.tree.setCurrentItem(child)
+                    self.tree.scrollToItem(child)
+                    return True
+                if recursive_search(child):
+                    return True
+            return False
+
+        root = self.tree.invisibleRootItem()
+        recursive_search(root)
+
 
 WINDOWS_MENU_STYLE = """
 QMenu {
@@ -197,14 +222,57 @@ QMenu::icon {
 }
 """
 
+
 def main():
     app = QApplication(sys.argv)
-    # 示例：选中某个文件
-    widget = XPTreeRightTop("C:/Users/Dell/Desktop/temp/log", selected_path="C:/Users/Dell/Desktop/temp/log/文件1.html")
+    # 示例：选中某个文件  , selected_path="C:/Users/Dell/Desktop/temp/log/文件1.html
+    widget = XPTreeRightTop("/Users/echo/Desktop/temp/test",
+                            selected_path="/Users/echo/Desktop/temp/test/新建文件/新建文件/多余的名字")
     widget.resize(600, 500)
     widget.setWindowTitle(f"目录树：{widget.custom_path}")
     widget.show()
     sys.exit(app.exec())
 
+
 if __name__ == "__main__":
     main()
+
+
+    # def select_path_item(self, path):
+    #     def recursive_search(item):
+    #         for i in range(item.childCount()):
+    #             child = item.child(i)
+    #             if child.data(0, Qt.UserRole) == path:
+    #                 self.tree.setCurrentItem(child)
+    #                 self.tree.scrollToItem(child)
+    #                 return True
+    #             if recursive_search(child):
+    #                 return True
+    #         return False
+    #
+    #     root = self.tree.invisibleRootItem()
+    #     recursive_search(root)
+
+    def select_path_item(self, target_path):
+        def normalize(p):
+            return os.path.normpath(os.path.abspath(p))
+
+        target_path = normalize(target_path)
+
+        def traverse_and_expand(parent):
+            for i in range(parent.childCount()):
+                child = parent.child(i)
+                child_path = child.data(0, Qt.UserRole)
+                if child_path and normalize(child_path) == target_path:
+                    self.tree.setCurrentItem(child)
+                    self.tree.scrollToItem(child)
+                    self.tree.expandItem(child)
+                    return True
+                elif child.childCount() > 0:
+                    self.tree.expandItem(child)
+                    if traverse_and_expand(child):
+                        return True
+            return False
+
+        root = self.tree.invisibleRootItem()
+        traverse_and_expand(root)
