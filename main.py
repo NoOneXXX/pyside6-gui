@@ -37,7 +37,7 @@ try:
     import sip
 except ImportError:
     sip = None
-from gui.func.under_top_menu.color_picker import RichTextColor
+from gui.func.under_top_menu.color_picker import ColorPickerTool
 # Custom Qt message handler for debugging
 def qt_message_handler(msg_type: QtMsgType, context, msg: str):
     print(f"Qt Message [{msg_type}]: {msg} ({context.file}:{context.line})")
@@ -278,10 +278,11 @@ class MainWindow(QMainWindow):
         format_menu.addAction(self.underline_action)
 
         '''颜色选择 '''
-        self.rtc = RichTextColor(self.rich_text_editor)
-        color_action = self.rtc.color_picker_action(self)
-        format_toolbar.addAction(color_action)
-        format_menu.addAction(color_action)
+        self.color_picker = ColorPickerTool(self.rich_text_editor, self)
+        format_toolbar.addWidget(self.color_picker.tool_button)
+        format_menu.addAction(self.color_picker.action)
+
+
 
 
         format_menu.addSeparator()
