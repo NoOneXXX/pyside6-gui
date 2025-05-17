@@ -7,14 +7,12 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox
 import uuid
 import time
 
-from gui.func.left.XPNotebookTree import XPNotebookTree
 from gui.func.utils.json_utils import JsonEditor
 from gui.data.NoteDB import NoteDB
 from gui.func.singel_pkg.single_manager import sm
 # 这个文件的引用不能删除 否则下面的图片就会找不到文件
 from gui.ui import resource_rc
 
-from gui.func.utils.tools_utils import read_parent_id
 
 '''
 file文件的事件操作和处理

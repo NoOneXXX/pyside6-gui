@@ -1,52 +1,84 @@
+from PySide6.QtCore import QObject, QSize, Qt, QPoint
+from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor, QIcon
 from PySide6.QtWidgets import (
-    QWidget, QMenu, QPushButton, QGridLayout, QWidgetAction,
-    QColorDialog, QToolButton
+    QToolButton, QDialog, QVBoxLayout, QPushButton,
+    QGridLayout, QFrame, QColorDialog
 )
-from PySide6.QtGui import QTextCharFormat, QTextCursor, QColor, QIcon, QAction
-from PySide6.QtCore import QSize, Qt
 
 '''
-富文本框的颜色选择
+颜色的选择
 '''
-class ColorPickerTool(QWidget):
+class ColorPickerTool(QObject):
     def __init__(self, text_edit, parent=None):
         super().__init__(parent)
         self.text_edit = text_edit
-        self.color_menu = QMenu(parent)
-        self._build_color_menu()
 
-        self.action = QAction(QIcon(":/images/edit-color.png"), "Text Color", self)
-        self.action.setStatusTip("Choose text color")
-        self.action.triggered.connect(self.show_menu)
-
-        # 工具栏按钮
         self.tool_button = QToolButton(parent)
-        self.tool_button.setIcon(self.action.icon())
-        self.tool_button.setToolTip(self.action.text())
-        self.tool_button.setPopupMode(QToolButton.InstantPopup)
-        self.tool_button.setMenu(self.color_menu)
+        self.tool_button.setIcon(QIcon(":/images/edit-color.png"))
+        self.tool_button.setToolTip("Text Color")
         self.tool_button.setAutoRaise(True)
         self.tool_button.setToolButtonStyle(Qt.ToolButtonIconOnly)
-        self.tool_button.setDefaultAction(self.action)
-        # 删掉这个按钮自带的向下角标
         self.tool_button.setStyleSheet("QToolButton::menu-indicator { image: none; }")
+        self.tool_button.clicked.connect(self.show_color_popup)
 
-    def _build_color_menu(self):
-        # 默认颜色
-        default_action = self.color_menu.addAction("Default Color")
-        default_action.triggered.connect(lambda: self.set_text_color("#000000"))
+    def show_color_popup(self):
+        popup = QDialog(self.tool_button)
+        popup.setWindowFlags(Qt.Popup)
+        popup.setStyleSheet("""
+            QDialog {
+                background-color: white;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+            }
+        """)
 
-        # 自定义颜色
-        custom_action = self.color_menu.addAction("New Color...")
-        custom_action.triggered.connect(self.pick_custom_color)
+        layout = QVBoxLayout(popup)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(2)
 
-        self.color_menu.addSeparator()
+        # Default Color
+        btn_default = QPushButton("Default Color")
+        btn_default.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background-color: transparent;
+                padding: 4px 6px;
+                color: #444;
+                font-size: 12px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: #e6e6e6;
+                border-radius: 4px;
+            }
+        """)
+        btn_default.clicked.connect(lambda: self.set_text_color_and_close("#000000", popup))
+        layout.addWidget(btn_default)
 
-        # 网格颜色块
-        color_grid_widget = QWidget()
-        grid_layout = QGridLayout(color_grid_widget)
+        # New Color...
+        btn_new_color = QPushButton("New Color…")
+        btn_new_color.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background-color: transparent;
+                padding: 4px 6px;
+                color: #444;
+                font-size: 12px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: #e6e6e6;
+                border-radius: 4px;
+            }
+        """)
+        btn_new_color.clicked.connect(lambda: self.open_color_dialog_and_close(popup))
+        layout.addWidget(btn_new_color)
+
+        # Color grid
+        color_grid = QFrame()
+        grid_layout = QGridLayout(color_grid)
         grid_layout.setSpacing(4)
-        grid_layout.setContentsMargins(5, 5, 5, 5)
+        grid_layout.setContentsMargins(0, 0, 0, 0)
 
         colors = [
             "#F4CCCC", "#FFF2CC", "#D9EAD3", "#CFE2F3", "#D9D2E9", "#EAD1DC",
@@ -60,32 +92,41 @@ class ColorPickerTool(QWidget):
         for i, color in enumerate(colors):
             btn = QPushButton()
             btn.setFixedSize(QSize(24, 24))
-            btn.setStyleSheet(f"background-color: {color}; border: 1px solid #aaa;")
-            btn.clicked.connect(lambda _, c=color: self.set_text_color(c))
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {color};
+                    border: 1px solid #aaa;
+                    border-radius: 4px;
+                }}
+                QPushButton:hover {{
+                    border: 1px solid #333;
+                }}
+            """)
+            btn.clicked.connect(lambda _, c=color: self.set_text_color_and_close(c, popup))
             grid_layout.addWidget(btn, i // 6, i % 6)
 
-        grid_action = QWidgetAction(self.color_menu)
-        grid_action.setDefaultWidget(color_grid_widget)
-        self.color_menu.addAction(grid_action)
+        layout.addWidget(color_grid)
+        popup.adjustSize()
+        popup.move(self.tool_button.mapToGlobal(QPoint(0, self.tool_button.height())))
+        popup.exec()
+
+    def set_text_color_and_close(self, color_code, dialog):
+        self.set_text_color(color_code)
+        dialog.accept()
+
+    def open_color_dialog_and_close(self, dialog):
+        color = QColorDialog.getColor()
+        if color.isValid():
+            self.set_text_color(color.name())
+        dialog.accept()
 
     def set_text_color(self, color_code):
         if not self.text_edit:
             return
-        color = QColor(color_code)
         cursor: QTextCursor = self.text_edit.textCursor()
         if not cursor.hasSelection():
             return
         fmt = QTextCharFormat()
-        fmt.setForeground(color)
+        fmt.setForeground(QColor(color_code))
         cursor.mergeCharFormat(fmt)
         self.text_edit.mergeCurrentCharFormat(fmt)
-
-    def pick_custom_color(self):
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.set_text_color(color.name())
-
-    def show_menu(self):
-        if self.tool_button and self.color_menu:
-            pos = self.tool_button.mapToGlobal(self.tool_button.rect().bottomLeft())
-            self.color_menu.popup(pos)

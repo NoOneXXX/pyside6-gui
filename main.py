@@ -277,10 +277,13 @@ class MainWindow(QMainWindow):
         format_toolbar.addAction(self.underline_action)
         format_menu.addAction(self.underline_action)
 
-        '''颜色选择 '''
+        # '''颜色选择 '''
+        # self.color_picker = ColorPickerTool(self.rich_text_editor, self)
+        # format_toolbar.addWidget(self.color_picker.tool_button)
+        # format_menu.addAction(self.color_picker.action)
+
         self.color_picker = ColorPickerTool(self.rich_text_editor, self)
         format_toolbar.addWidget(self.color_picker.tool_button)
-        format_menu.addAction(self.color_picker.action)
 
 
 
