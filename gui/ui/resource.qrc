@@ -27,5 +27,9 @@
     <file alias="open.png">../images/tree/open.png</file>
     <file alias="grandidier.jpg">../images/tree/grandidier.jpg</file>
     <file alias="note-violet.png">../images/tree/note-violet.png</file>
+    <file alias="book-close.png">../images/tree/book-close.png</file>
+    <file alias="book-open.png">../images/tree/book-open.png</file>
+    <file alias="minus-square.svg">../images/tree/minus-square.svg</file>
+    <file alias="plus-square.svg">../images/tree/plus-square.svg</file>
   </qresource>
 </RCC>

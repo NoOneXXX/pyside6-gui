@@ -175,10 +175,10 @@ class XPNotebookTree(QWidget):
 
         editor = JsonEditor()
         content_type = editor.read_notebook_if_dir(file_path)
+        # 这个是发送地址给main那边 在那边自动保存的时候使用
+        sm.send_current_file_path_2_main_richtext_signal.emit(file_path, 'left')
         if content_type == "file" and self.rich_text_edit:
             file_path = os.path.join(file_path, ".note.html")
-            # 这个是发送地址给main那边 在那边自动保存的时候使用
-            sm.send_current_file_path_2_main_richtext_signal.emit(file_path)
             with open(file_path, "r", encoding="utf-8") as f:
                 html = f.read()
             # 必须先设置 baseUrl
@@ -373,6 +373,7 @@ class XPNotebookTree(QWidget):
             item.setIcon(0, self.file_icon)
         else:
             item.setIcon(0, QIcon())  # 默认
+
 
 
 

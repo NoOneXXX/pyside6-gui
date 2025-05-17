@@ -111,6 +111,11 @@ class XPTreeRightTop(QWidget):
 
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.setItemDelegate(CustomTreeItemDelegate())
+        '''自定义前面的图标'''
+        self.tree.setStyleSheet(QTREEW_WIDGET_STYLE)
+
+        # 左键点击事件 点击的时候就展开 不是只有点击前面的加号减号才展开
+        self.tree.itemClicked.connect(self.on_item_clicked)
 
         if os.path.exists(self.custom_path):
             root = QTreeWidgetItem(self.tree)
@@ -192,6 +197,36 @@ class XPTreeRightTop(QWidget):
         root = self.tree.invisibleRootItem()
         recursive_search(root)
 
+    '''
+    左键点击的方法实现
+    '''
+    def on_item_clicked(self, item):
+        # 这个是在点击的时候将树状图给展开和合并
+        if item.childCount() > 0:
+            if item.isExpanded():
+                item.setExpanded(False)
+                self.handle_item_collapsed(item)
+            else:
+                item.setExpanded(True)
+                self.handle_item_expanded(item)
+
+        file_path = item.data(0, Qt.UserRole)
+        # 这个是发送地址给main那边 在那边自动保存的时候使用
+        sm.send_current_file_path_2_main_richtext_signal.emit(file_path, 'right_top_cor')
+        editor = JsonEditor()
+        content_type = editor.read_notebook_if_dir(file_path)
+        if content_type == "file" and self.rich_text_edit:
+            file_path = os.path.join(file_path, ".note.html")
+            with open(file_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            # 必须先设置 baseUrl
+            base_url = QUrl.fromLocalFile(os.path.dirname(file_path) + os.sep)
+            self.rich_text_edit.document().setBaseUrl(base_url)
+
+            # 设置内容
+            self.rich_text_edit.setHtml(html)
+
+
 
 WINDOWS_MENU_STYLE = """
 QMenu {
@@ -222,6 +257,20 @@ QMenu::icon {
 }
 """
 
+'''树状图前面的图标'''
+QTREEW_WIDGET_STYLE = """
+        QTreeView::branch {
+            background: transparent;
+        }
+        QTreeView::branch:has-children:!has-siblings:closed,
+        QTreeView::branch:closed:has-children {
+            image: url(:images/plus-square.svg);
+        }
+        QTreeView::branch:open:has-children:!has-siblings,
+        QTreeView::branch:open:has-children {
+            image: url(:images/minus-square.svg);
+        }
+        """
 
 def main():
     app = QApplication(sys.argv)

@@ -2,6 +2,7 @@ import os
 import re
 import sys
 
+from gui.func.utils.json_utils import JsonEditor
 # Import the resource file to register the resources
 # 这个文件的引用不能删除 否则下面的图片就会找不到文件
 from gui.ui import resource_rc
@@ -83,7 +84,7 @@ class MainWindow(QMainWindow):
             if widget is not None:
                 widget.setParent(None)
 
-        # 加载 XPNotebookTree
+        # 加载 XPNotebookTree 右上角的树
         tree = XPTreeRightTop("")
         self.layout.addWidget(tree)
         # 绑定又上角-----------------结束--------------------------
@@ -278,14 +279,8 @@ class MainWindow(QMainWindow):
         format_menu.addAction(self.underline_action)
 
         # '''颜色选择 '''
-        # self.color_picker = ColorPickerTool(self.rich_text_editor, self)
-        # format_toolbar.addWidget(self.color_picker.tool_button)
-        # format_menu.addAction(self.color_picker.action)
-
         self.color_picker = ColorPickerTool(self.rich_text_editor, self)
         format_toolbar.addWidget(self.color_picker.tool_button)
-
-
 
 
         format_menu.addSeparator()
@@ -409,11 +404,14 @@ class MainWindow(QMainWindow):
     def auto_save_note(self):
         """Auto-save note and ensure all inserted images are saved and displayable."""
         #
-        print(self.richtext_saved_path)
-        if self.richtext_saved_path is not None:
-            self.rich_text_editor.html_file_path = self.richtext_saved_path
+        editor = JsonEditor()
+        content_type = editor.read_notebook_if_dir(self.richtext_saved_path)
+        if content_type == "file" and self.richtext_saved_path is not None:
+            # 写入到对应的文件
+            file_path = os.path.join(self.richtext_saved_path, ".note.html")
+            self.rich_text_editor.html_file_path = file_path
             self.rich_text_editor.clean_base64_images()
-            with open(self.richtext_saved_path, 'w', encoding='utf-8') as f:
+            with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(self.rich_text_editor.toHtml())
 
 
@@ -609,20 +607,20 @@ class MainWindow(QMainWindow):
         self.ui.verticalSplitter.setSizes([215, self.height() - 215])
     '''
     富文本框的路径接收
+    第一个参数判断路径 第二个参数判断树状图的属性 是属于谁的
     '''
-    @Slot(str)
-    def receiver_path(self,path_):
+    @Slot(str, str)
+    def receiver_path(self,path_, flag):
         self.richtext_saved_path = path_
         print('------------------->', self.richtext_saved_path)
         # 右上角的数据渲染
-        # 获取父目录
-        parent_dir = os.path.dirname(path_)
-        parent_p_dir = os.path.dirname(parent_dir)
-        print('父目录路径：', parent_dir)
-        # 清空 noteTreeContainer 中旧的 XPNotebookTree（右上角）
-        self.clear_layout(self.layout)
-        tree = XPTreeRightTop(parent_p_dir)
-        self.layout.addWidget(tree)
+        # 获取父目录 只有左侧的树状图点击的时候才会显示 右上角的结构 防止右上角的点击出现循环
+        if 'left' == flag:
+            # 清空 noteTreeContainer 中旧的 XPNotebookTree（右上角）
+            self.clear_layout(self.layout)
+            tree = XPTreeRightTop(path_,rich_text_edit=self.rich_text_editor)
+            self.layout.addWidget(tree)
+
 
 
 
