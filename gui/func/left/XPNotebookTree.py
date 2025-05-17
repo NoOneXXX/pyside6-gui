@@ -131,11 +131,6 @@ class XPNotebookTree(QWidget):
         if not old_path or not os.path.exists(old_path):
             return
 
-        # 只处理刚创建的项
-        is_new = item.data(0, Qt.UserRole + 1)
-        if not is_new:
-            return
-
         new_name = item.text(0).strip()
         if not new_name or new_name == os.path.basename(old_path):
             return
@@ -152,7 +147,7 @@ class XPNotebookTree(QWidget):
         try:
             os.rename(old_path, new_path)
             item.setData(0, Qt.UserRole, new_path)
-            item.setData(0, Qt.UserRole + 1, None)  # ✅ 移除“刚创建”标记
+            item.setData(0, Qt.UserRole + 1, None)  #移除“刚创建”标记
             self._update_child_user_roles(item, old_path, new_path)
         except Exception as e:
             QMessageBox.critical(self, "重命名失败", str(e))
@@ -267,7 +262,6 @@ class XPNotebookTree(QWidget):
     创建一个新的文件
     从ui下面的home.html 取出文件的模板
     '''
-
     def create_file_item(self, item, index=0):
         dir_path = item.data(0, Qt.UserRole)
         name = '新建文件' if index == 0 else f'新建文件-{index}'
