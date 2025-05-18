@@ -344,6 +344,20 @@ class MainWindow(QMainWindow):
         format_group.addAction(self.alignr_action)
         format_group.addAction(self.alignj_action)
 
+        color_toolbar = QToolBar("Color")
+        color_toolbar.setIconSize(QSize(16, 16))
+        self.addToolBar(color_toolbar)
+        color_menu = self.menuBar().addMenu("&Format")
+        self.bold_action = QAction(
+            QIcon(":/images/edit-bold.png"), "Bold", self
+        )
+        self.bold_action.setStatusTip("Bold")
+        self.bold_action.setShortcut(QKeySequence.StandardKey.Bold)
+        self.bold_action.setCheckable(True)
+        self.bold_action.triggered.connect(self.toggle_bold)
+        color_toolbar.addAction(self.bold_action)
+        color_menu.addAction(self.bold_action)
+
         # Add search box and button
         search_widget = QWidget()
         search_layout = QHBoxLayout(search_widget)
@@ -356,8 +370,8 @@ class MainWindow(QMainWindow):
         # Add a spacer widget to push search_widget to the right
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        format_toolbar.addWidget(spacer)
-        format_toolbar.addWidget(search_widget)
+        color_toolbar.addWidget(spacer)
+        # color_toolbar.addWidget(search_widget)
 
         self._format_actions = [
             self.fonts,
@@ -620,6 +634,7 @@ class MainWindow(QMainWindow):
             self.clear_layout(self.layout)
             tree = XPTreeRightTop(path_,rich_text_edit=self.rich_text_editor)
             self.layout.addWidget(tree)
+
 
 
 

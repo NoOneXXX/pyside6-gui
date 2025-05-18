@@ -121,9 +121,14 @@ class XPTreeRightTop(QWidget):
             root = QTreeWidgetItem(self.tree)
             notebook_name = os.path.basename(self.custom_path)
             root.setText(0, notebook_name)
-            stat = os.stat(self.custom_path)
-            root.setText(1, format_time(stat.st_ctime))
-            root.setText(2, format_time(stat.st_mtime))
+            # 获取创建时间和更新时间
+            json_editor = JsonEditor()
+            detail_infos = json_editor.read_file_metadata_infos(self.custom_path)
+            create_time = detail_infos['created_time']
+            modified_time = detail_infos['modified_time']
+            print('modified_time---->', format_time(modified_time),'create_time---->', format_time(create_time))
+            root.setText(1, format_time(create_time))
+            root.setText(2, format_time(modified_time))
             root.setIcon(0, self.folder_closed_icon)
             font = QFont("Segoe UI", 12)
             font.setBold(True)
@@ -284,44 +289,16 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import datetime
+
+    timestamp = 1747149803  # 示例时间戳（秒）
+    dt = datetime.datetime.fromtimestamp(timestamp)
+    formatted = dt.strftime("%Y-%m-%d %H:%M:%S")  # 年-月-日 格式
+    print(formatted)
 
 
-    # def select_path_item(self, path):
-    #     def recursive_search(item):
-    #         for i in range(item.childCount()):
-    #             child = item.child(i)
-    #             if child.data(0, Qt.UserRole) == path:
-    #                 self.tree.setCurrentItem(child)
-    #                 self.tree.scrollToItem(child)
-    #                 return True
-    #             if recursive_search(child):
-    #                 return True
-    #         return False
-    #
-    #     root = self.tree.invisibleRootItem()
-    #     recursive_search(root)
 
-    def select_path_item(self, target_path):
-        def normalize(p):
-            return os.path.normpath(os.path.abspath(p))
 
-        target_path = normalize(target_path)
 
-        def traverse_and_expand(parent):
-            for i in range(parent.childCount()):
-                child = parent.child(i)
-                child_path = child.data(0, Qt.UserRole)
-                if child_path and normalize(child_path) == target_path:
-                    self.tree.setCurrentItem(child)
-                    self.tree.scrollToItem(child)
-                    self.tree.expandItem(child)
-                    return True
-                elif child.childCount() > 0:
-                    self.tree.expandItem(child)
-                    if traverse_and_expand(child):
-                        return True
-            return False
 
-        root = self.tree.invisibleRootItem()
-        traverse_and_expand(root)
+
