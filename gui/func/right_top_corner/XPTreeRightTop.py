@@ -15,7 +15,7 @@ from gui.func.singel_pkg.single_manager import sm
 from gui.func.utils.json_utils import JsonEditor
 from gui.func.utils.tools_utils import read_parent_id, create_metadata_file_under_dir, create_metadata_dir_under_dir
 from gui.func.left.CustomTreeItemDelegate import CustomTreeItemDelegate
-
+from PySide6.QtCore import QTimer
 
 def format_time(ts):
     return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
@@ -34,7 +34,7 @@ class XPTreeRightTop(QWidget):
 
         self.tree = None
         self.setup_ui()
-        from PySide6.QtCore import QTimer
+
         QTimer.singleShot(100, lambda: self.select_path_item(self.selected_path)) if self.selected_path else None
 
         # 确保 tree 已初始化和填充
@@ -94,7 +94,6 @@ class XPTreeRightTop(QWidget):
         self.tree.header().setSectionResizeMode(1, QHeaderView.Interactive)
         self.tree.setColumnWidth(1, 250)  # 设置第二列宽度
         self.tree.header().setSectionResizeMode(2, QHeaderView.Interactive)
-
         style = QStyleFactory.create("Fusion")
         if style:
             self.tree.setStyle(style)
@@ -262,8 +261,18 @@ QMenu::icon {
 }
 """
 
-'''树状图前面的图标'''
+'''树状图前面的图标 '''
 QTREEW_WIDGET_STYLE = """
+    QTreeWidget {
+            border: 1px solid #CCCCCC;
+            border-radius: 8px;  /* 圆角边框 */
+            background-color: #FFFFFF;
+            padding: 4px;
+        }
+
+    QTreeView::branch {
+        background: transparent;
+    }
         QTreeView::branch {
             background: transparent;
         }

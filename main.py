@@ -70,13 +70,17 @@ class MainWindow(QMainWindow):
 
         # 绑定这个展示树状图的方法
         sm.left_tree_structure_rander_after_create_new_notebook_signal.connect(self.xp_tree_widget_)
+
         # 绑定又上角-------------------------------------------
+        self.ui.noteTreeContainer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
         # 设置 layout，如果没有则添加
         if self.ui.noteTreeContainer.layout() is None:
             self.layout = QVBoxLayout(self.ui.noteTreeContainer)
         else:
             self.layout = self.ui.noteTreeContainer.layout()
-
+        self.layout.setContentsMargins(0, 0, 0, 0)  # 必须加
+        self.layout.setSpacing(0)
         # 清除旧内容
         for i in reversed(range(self.layout.count())):
             item = self.layout.itemAt(i)
@@ -86,6 +90,7 @@ class MainWindow(QMainWindow):
 
         # 加载 XPNotebookTree 右上角的树
         tree = XPTreeRightTop("")
+        tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 设置扩展策略
         self.layout.addWidget(tree)
         # 绑定又上角-----------------结束--------------------------
 
@@ -110,6 +115,11 @@ class MainWindow(QMainWindow):
         self.ui.noteContentTable.horizontalHeader().setStretchLastSection(True)
         self.ui.noteContentTable.verticalHeader().setStretchLastSection(True)
 
+        # Ensure the cell widget (RichTextEdit) fits perfectly
+        self.ui.noteContentTable.setRowHeight(0, self.ui.noteContentTable.height())
+        self.ui.noteContentTable.setColumnWidth(0, self.ui.noteContentTable.width())
+        # Remove any default margins in the table
+        self.ui.noteContentTable.setContentsMargins(0, 0, 0, 0)
         self.path = None
 
         self.status = QStatusBar()
@@ -633,8 +643,8 @@ class MainWindow(QMainWindow):
             # 清空 noteTreeContainer 中旧的 XPNotebookTree（右上角）
             self.clear_layout(self.layout)
             tree = XPTreeRightTop(path_,rich_text_edit=self.rich_text_editor)
+            tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # ✅ 设置扩展策略
             self.layout.addWidget(tree)
-
 
 
 
