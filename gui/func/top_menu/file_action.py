@@ -21,6 +21,12 @@ class FileActions:
     def __init__(self, parent=None):
         self.parent = parent  # 通常是 QMainWindow，用来绑定对话框等
         self.note_db = None
+        # 默认打开最近一次笔记本
+        note_db = NoteDB("recent_notebooks.db")
+        if note_db:
+            list_path = note_db.get_recent_notebooks(1)
+            if list_path:
+                sm.left_tree_structure_rander_after_create_new_notebook_signal.emit(list_path[0])
 
     '''
     创建笔记本的action
@@ -98,6 +104,9 @@ class FileActions:
 
 
     def open_folder(self):
+        # 保存这个笔记本的路径
+        # 统一的 recent_notebooks.db 数据库文件路径
+        note_db = NoteDB("recent_notebooks.db")
         # 弹出对话框选择要创建新文件夹的位置（用户选择一个父目录）
         folder_path = QFileDialog.getExistingDirectory(
             self.parent, "选择要打开的笔记本"
@@ -109,9 +118,7 @@ class FileActions:
                 return
         # 赋值给path_
         self.path_ = folder_path
-        # 保存这个笔记本的路径
-        # 统一的 recent_notebooks.db 数据库文件路径
-        note_db = NoteDB( "recent_notebooks.db")
+
         # 这个路径存在就更新时间 不存在就保存
         note_db.save_recent_notebook(folder_path, int(time.time()))
         # 笔记被成功创建后 发射信号通知主窗口要进行渲染左边的树
@@ -200,6 +207,7 @@ class FileActions:
                     created_time=timestamp,
                     updated_time=timestamp
                 )
+
 
 
 
