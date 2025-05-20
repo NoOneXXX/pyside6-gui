@@ -131,6 +131,8 @@ class MainWindow(QMainWindow):
         self.ui.menuFile.addAction(self.file_actions.create_file_action())
         # 打开笔记
         self.ui.menuFile.addAction(self.file_actions.open_notebook_action())
+        # 打开最近的笔记本
+        self.ui.menuFile.addAction(self.file_actions.open_recent_notebook_action())
 
 
         save_file_action = QAction(
