@@ -66,11 +66,7 @@ class FileActions:
 
         # 创建子菜单（即最近文件路径列表）
         recent_menu = QMenu(self.parent)
-
-        APP_ROOT = os.path.dirname(os.path.abspath(__file__))
-        # 统一的 recent_notebooks.db 数据库文件路径
-        RECENT_DB_PATH = os.path.join(APP_ROOT, "recent_notebooks.db")
-        note_db = NoteDB(RECENT_DB_PATH)
+        note_db = NoteDB("recent_notebooks.db")
 
         # 加载最近的笔记本
         recent_paths = note_db.get_recent_notebooks(3)
@@ -114,10 +110,8 @@ class FileActions:
         # 赋值给path_
         self.path_ = folder_path
         # 保存这个笔记本的路径
-        APP_ROOT = os.path.dirname(os.path.abspath(__file__))
         # 统一的 recent_notebooks.db 数据库文件路径
-        RECENT_DB_PATH = os.path.join(APP_ROOT, "recent_notebooks.db")
-        note_db = NoteDB(RECENT_DB_PATH)
+        note_db = NoteDB( "recent_notebooks.db")
         # 这个路径存在就更新时间 不存在就保存
         note_db.save_recent_notebook(folder_path, int(time.time()))
         # 笔记被成功创建后 发射信号通知主窗口要进行渲染左边的树
