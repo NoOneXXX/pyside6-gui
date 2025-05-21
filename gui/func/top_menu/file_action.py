@@ -75,13 +75,34 @@ class FileActions:
         note_db = NoteDB("recent_notebooks.db")
 
         # 加载最近的笔记本
-        recent_paths = note_db.get_recent_notebooks(3)
+        recent_paths = note_db.get_recent_notebooks(15)
+        recent_menu.setStyleSheet("""
+            QMenu {
+                background-color: #ffffff;
+                color: #000000;
+                border: 1px solid #cccccc;
+                border-radius: 8px;  /* 设置圆角半径 */
+                padding: 4px;
+            }
+
+            QMenu::item {
+                padding: 6px 24px;
+                background-color: transparent;
+                border-radius: 4px;  /* 给 item 也加圆角，避免选中时遮住菜单圆角 */
+            }
+
+            QMenu::item:selected {
+                background-color: #cce8ff;  /* 浅蓝色，模拟 Win10 的悬浮 */
+                border-radius: 4px;
+            }
+        """)
 
         for idx, path in enumerate(recent_paths, start=1):
             sub_action = QAction(f"{idx}. {path}", self.parent)
             sub_action.setData(path)
             sub_action.triggered.connect(lambda checked=False, p=path: self.open_recent_notebook_path(p))
             recent_menu.addAction(sub_action)
+
 
         # 关键：将 menu 设置给这个 QAction，点击后就能弹出子菜单
         action.setMenu(recent_menu)
@@ -118,9 +139,9 @@ class FileActions:
                 return
         # 赋值给path_
         self.path_ = folder_path
-
-        # 这个路径存在就更新时间 不存在就保存
-        note_db.save_recent_notebook(folder_path, int(time.time()))
+        if folder_path and os.path.exists(folder_path):
+            # 这个路径存在就更新时间 不存在就保存
+            note_db.save_recent_notebook(folder_path, int(time.time()))
         # 笔记被成功创建后 发射信号通知主窗口要进行渲染左边的树
         sm.left_tree_structure_rander_after_create_new_notebook_signal.emit(folder_path)
 
@@ -154,7 +175,8 @@ class FileActions:
                 RECENT_DB_PATH = os.path.join(APP_ROOT, "recent_notebooks.db")
                 note_db = NoteDB(RECENT_DB_PATH)
                 # 这个路径存在就更新时间 不存在就保存
-                note_db.save_recent_notebook(file_path, int(time.time()))
+                if file_path:
+                    note_db.save_recent_notebook(file_path, int(time.time()))
 
                 # 笔记被成功创建后 发射信号通知主窗口要进行渲染左边的树
                 sm.left_tree_structure_rander_after_create_new_notebook_signal.emit(file_path)
@@ -207,6 +229,7 @@ class FileActions:
                     created_time=timestamp,
                     updated_time=timestamp
                 )
+
 
 
 

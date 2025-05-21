@@ -127,6 +127,24 @@ class MainWindow(QMainWindow):
 
         # 初始化功能类
         self.file_actions = FileActions(self)  # 传入 self 以便弹窗等能绑定主窗口
+        self.ui.menuFile.setStyleSheet("""
+            QMenu {
+                background-color: #ffffff;
+                color: #000000;
+                border: 1px solid #ccc;
+                border-radius: 8px;  /* 设置圆角半径 */
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 6px 24px;
+                border-radius: 4px;  /* 给 item 也加圆角，避免选中时遮住菜单圆角 */
+            }
+            QMenu::item:selected {
+                background-color: #cce8ff;  /* 浅蓝色 */
+                border-radius: 4px;
+            }
+        """)
+
         # 创建笔记
         self.ui.menuFile.addAction(self.file_actions.create_file_action())
         # 打开笔记
