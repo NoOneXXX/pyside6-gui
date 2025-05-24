@@ -14,6 +14,7 @@ from gui.func.singel_pkg.single_manager import sm
 from gui.func.utils.json_utils import JsonEditor
 from gui.func.utils.tools_utils import read_parent_id, create_metadata_file_under_dir, create_metadata_dir_under_dir
 from gui.func.left.CustomTreeItemDelegate import CustomTreeItemDelegate
+from gui.func.utils.file_loader import load_file
 class XPNotebookTree(QWidget):
     def __init__(self, path, rich_text_edit=None, parent=None):
         super().__init__(parent)
@@ -62,6 +63,14 @@ class XPNotebookTree(QWidget):
                     #  也允许子文件结构（懒加载子节点）
                     file_item.addChild(QTreeWidgetItem())  # 懒加载标记
 
+                elif content_type == "epub":
+                    # 处理 epub 文件类型
+                    pdf_item = QTreeWidgetItem(parent_item)
+                    pdf_item.setText(0, os.path.splitext(name)[0])
+                    pdf_item.setIcon(0, QIcon(QPixmap(":images/pdf-icon.png")))  # 用你自己的 PDF 图标路径
+                    pdf_item.setData(0, Qt.UserRole, full_path)
+                    pdf_item.addChild(QTreeWidgetItem())  # 懒加载标记
+
         except PermissionError:
             pass
 
@@ -83,6 +92,14 @@ class XPNotebookTree(QWidget):
         self.tree.setHeaderHidden(True)
         self.tree.setRootIsDecorated(True)
         self.tree.setIndentation(16)
+
+        # === 添加拖拽支持 ===
+        self.tree.setDragEnabled(True)  # 允许节点被拖动
+        self.tree.setAcceptDrops(True)  # 允许将其他节点拖到该树上
+        self.tree.setDropIndicatorShown(True)  # 显示拖拽指示线
+        self.tree.setDragDropMode(QTreeWidget.InternalMove)  # 设置为树内部的移动操作
+        # === 拖拽支持结束 ===
+
         self.tree.setSelectionBehavior(QTreeWidget.SelectRows)
         self.tree.setAllColumnsShowFocus(True)
         self.tree.header().setStretchLastSection(True)
@@ -172,6 +189,15 @@ class XPNotebookTree(QWidget):
         content_type = editor.read_notebook_if_dir(file_path)
         # 这个是发送地址给main那边 在那边自动保存的时候使用
         sm.send_current_file_path_2_main_richtext_signal.emit(file_path, 'left')
+
+
+        # 支持加载的类型：pdf、docx、txt、epub
+        supported_exts = ['pdf', 'docx', 'txt', 'epub']
+        if  content_type in supported_exts:
+            path_s = os.path.join(file_path, "江湖丛谈.epub")
+            # 加载支持的文件类型（PDF、Word、TXT、EPUB）
+            load_file(path_s, self.rich_text_edit)
+
         if content_type == "file" and self.rich_text_edit:
             file_path = os.path.join(file_path, ".note.html")
             with open(file_path, "r", encoding="utf-8") as f:

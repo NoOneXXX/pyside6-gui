@@ -16,23 +16,55 @@ class RichTextEdit(QTextEdit):
         self._cleaning_base64 = False
 
     def insertFromMimeData(self, source: QMimeData):
+        # 情况 1：如果剪贴板中包含图片数据（例如截图）
         if source.hasImage():
             image = source.imageData()
             if isinstance(image, QImage):
-                # 保存图片
                 if not self.html_file_path:
                     print("请先设置 html_file_path")
                     return
 
+                # 获取 HTML 文件所在目录，用于保存粘贴的图片
                 html_dir = os.path.dirname(self.html_file_path)
+
+                # 生成一个唯一的图片文件名
                 img_name = f"pasted_img_{len(os.listdir(html_dir))}.png"
                 img_path = os.path.join(html_dir, img_name)
+
+                # 保存图片到文件
                 image.save(img_path)
 
-                # 插入图片使用相对路径
+                # 使用相对路径将图片插入到富文本框中
                 self.textCursor().insertHtml(f'<img src="{img_name}">')
+
+        # 情况 2：如果是拖拽或复制的文件（URL），例如拖拽一个本地图片进来
+        elif source.hasUrls():
+            for url in source.urls():
+                local_path = url.toLocalFile()
+
+                # 仅处理常见图片格式
+                if local_path.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif")):
+                    if not self.html_file_path:
+                        print("请先设置 html_file_path")
+                        continue
+
+                    html_dir = os.path.dirname(self.html_file_path)
+
+                    # 生成新的文件名，并拷贝图片到 HTML 文件目录中
+                    img_name = f"dragged_img_{len(os.listdir(html_dir))}.png"
+                    img_path = os.path.join(html_dir, img_name)
+
+                    from shutil import copyfile
+                    copyfile(local_path, img_path)
+
+                    # 插入到 HTML 中使用相对路径
+                    self.textCursor().insertHtml(f'<img src="{img_name}">')
+                else:
+                    # 如果不是图片，默认插入路径字符串
+                    self.textCursor().insertText(local_path)
+
+        # 情况 3：默认处理，比如复制粘贴文本
         else:
-            # 默认行为处理文本或其他
             super().insertFromMimeData(source)
 
     def clean_base64_images(self):

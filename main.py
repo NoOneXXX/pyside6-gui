@@ -2,6 +2,7 @@ import os
 import re
 import sys
 
+
 from gui.func.utils.json_utils import JsonEditor
 # Import the resource file to register the resources
 # 这个文件的引用不能删除 否则下面的图片就会找不到文件
@@ -656,7 +657,6 @@ class MainWindow(QMainWindow):
     @Slot(str, str)
     def receiver_path(self,path_, flag):
         self.richtext_saved_path = path_
-        print('------------------->', self.richtext_saved_path)
         # 右上角的数据渲染
         # 获取父目录 只有左侧的树状图点击的时候才会显示 右上角的结构 防止右上角的点击出现循环
         if 'left' == flag:
