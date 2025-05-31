@@ -32,5 +32,6 @@
     <file alias="book-open.png">../images/tree/book-open.png</file>
     <file alias="minus-square.svg">../images/tree/minus-square.svg</file>
     <file alias="plus-square.svg">../images/tree/plus-square.svg</file>
+    <file alias="e-book.png">../images/tree/e-book.png</file>
   </qresource>
 </RCC>

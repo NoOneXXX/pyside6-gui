@@ -35,6 +35,7 @@ from gui.func.right_top_corner.XPTreeRightTop import XPTreeRightTop
 from gui.func.right_bottom_corner.RichTextEdit import RichTextEdit
 from gui.func.top_menu.file_action import FileActions
 from gui.func.singel_pkg.single_manager import sm
+from gui.func.utils.constants import FONT_SIZES
 try:
     import sip
 except ImportError:
@@ -267,9 +268,13 @@ class MainWindow(QMainWindow):
         format_toolbar.addWidget(self.fonts)
 
         # Define font sizes locally since constants.FONT_SIZES is unavailable
-        FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 36]
+
         self.fontsize = QComboBox()
         self.fontsize.addItems([str(s) for s in FONT_SIZES])
+        # 设置默认选项为 14
+        self.fontsize.setCurrentText("14")
+        # 设置富文本初始字体大小为 14
+        self.rich_text_editor.setFontPointSize(14)
         self.fontsize.currentTextChanged.connect(
             lambda s: self.rich_text_editor.setFontPointSize(float(s))
         )
@@ -663,7 +668,7 @@ class MainWindow(QMainWindow):
             # 清空 noteTreeContainer 中旧的 XPNotebookTree（右上角）
             self.clear_layout(self.layout)
             tree = XPTreeRightTop(path_,rich_text_edit=self.rich_text_editor)
-            tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # ✅ 设置扩展策略
+            tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  #  设置扩展策略
             self.layout.addWidget(tree)
 
 

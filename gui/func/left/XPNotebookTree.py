@@ -12,7 +12,8 @@ import sys
 import os
 from gui.func.singel_pkg.single_manager import sm
 from gui.func.utils.json_utils import JsonEditor
-from gui.func.utils.tools_utils import read_parent_id, create_metadata_file_under_dir, create_metadata_dir_under_dir
+from gui.func.utils.tools_utils import (read_parent_id, create_metadata_file_under_dir,
+                                        create_metadata_dir_under_dir, scan_supported_files)
 from gui.func.left.CustomTreeItemDelegate import CustomTreeItemDelegate
 from gui.func.utils.file_loader import load_file
 class XPNotebookTree(QWidget):
@@ -26,6 +27,7 @@ class XPNotebookTree(QWidget):
         self.folder_closed_icon = QIcon(QPixmap(":images/folder-orange.png"))
         self.folder_open_icon = QIcon(QPixmap(":images/folder-orange-open.png"))
         self.file_icon = QIcon(QPixmap(":images/note-violet.png"))
+        self.e_book_icon = QIcon(QPixmap(":images/e-book.png"))
 
         self.tree = None
         self.setup_ui()
@@ -67,7 +69,7 @@ class XPNotebookTree(QWidget):
                     # 处理 epub 文件类型
                     pdf_item = QTreeWidgetItem(parent_item)
                     pdf_item.setText(0, os.path.splitext(name)[0])
-                    pdf_item.setIcon(0, QIcon(QPixmap(":images/pdf-icon.png")))  # 用你自己的 PDF 图标路径
+                    pdf_item.setIcon(0, self.e_book_icon)  # 用你自己的 epub 图标路径
                     pdf_item.setData(0, Qt.UserRole, full_path)
                     pdf_item.addChild(QTreeWidgetItem())  # 懒加载标记
 
@@ -190,13 +192,13 @@ class XPNotebookTree(QWidget):
         # 这个是发送地址给main那边 在那边自动保存的时候使用
         sm.send_current_file_path_2_main_richtext_signal.emit(file_path, 'left')
 
-
         # 支持加载的类型：pdf、docx、txt、epub
         supported_exts = ['pdf', 'docx', 'txt', 'epub']
         if  content_type in supported_exts:
-            path_s = os.path.join(file_path, "江湖丛谈.epub")
+            # 扫面这个目录下的文件然后找到符合文件名字的路径
+            exts_file_path = scan_supported_files(file_path,supported_exts)
             # 加载支持的文件类型（PDF、Word、TXT、EPUB）
-            load_file(path_s, self.rich_text_edit)
+            load_file(exts_file_path, self.rich_text_edit)
 
         if content_type == "file" and self.rich_text_edit:
             file_path = os.path.join(file_path, ".note.html")
@@ -324,7 +326,6 @@ class XPNotebookTree(QWidget):
     '''
     创建文件夹
     '''
-
     def create_dir_action(self, item, index_=0):
         dir_path = item.data(0, Qt.UserRole)
         name = '新建文件' if index_ == 0 else f'新建文件-{index_}'
@@ -393,6 +394,7 @@ class XPNotebookTree(QWidget):
             item.setIcon(0, self.file_icon)
         else:
             item.setIcon(0, QIcon())  # 默认
+
 
 
 
