@@ -1,9 +1,11 @@
 import os
-import re
 import sys
 
+from PySide6.QtWebEngineCore import QWebEngineSettings
+from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from gui.func.utils.json_utils import JsonEditor
+from gui.func.utils.read_pdf_epud_txt_word_type.read_pdf import PDFPreviewer
 # Import the resource file to register the resources
 # 这个文件的引用不能删除 否则下面的图片就会找不到文件
 from gui.ui import resource_rc
@@ -41,6 +43,9 @@ try:
 except ImportError:
     sip = None
 from gui.func.under_top_menu.color_picker import ColorPickerTool
+import shutil
+from urllib.parse import quote
+
 # Custom Qt message handler for debugging
 def qt_message_handler(msg_type: QtMsgType, context, msg: str):
     print(f"Qt Message [{msg_type}]: {msg} ({context.file}:{context.line})")
@@ -108,7 +113,12 @@ class MainWindow(QMainWindow):
 
         # Add editor to noteContentTable
         self.ui.noteContentTable.setCellWidget(0, 0, self.rich_text_editor)
-
+        # default editor is rich text editor
+        self.current_editor = self.rich_text_editor  # 默认
+        # 方法绑定 渲染pdf的时候转换引擎
+        sm.send_pdf_path_2_main_signal.connect(self.replace_rictEditor_2_QWebEngineView)
+        # 当pdf那边转换的了渲染引擎后 要重新换回来
+        sm.change_web_engine_2_richtext_signal.connect(self.change_2_rich_text_editor)
         # Adjust table size
         self.ui.noteContentTable.setRowHeight(0, self.ui.noteContentTable.height())
         self.ui.noteContentTable.setColumnWidth(0, self.ui.noteContentTable.width())
@@ -671,7 +681,40 @@ class MainWindow(QMainWindow):
             tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  #  设置扩展策略
             self.layout.addWidget(tree)
 
+    # 动态的加载pdf
+    @Slot(str)
+    def replace_rictEditor_2_QWebEngineView(self, file_path):
+        previewer = PDFPreviewer()
+        webview = previewer.get_webview(file_path)
 
+        # 替换 UI 中组件
+        current_widget = self.ui.noteContentTable.cellWidget(0, 0)
+        if current_widget:
+            current_widget.setParent(None)
+        self.ui.noteContentTable.setCellWidget(0, 0, webview)
+        self.ui.noteContentTable.setRowHeight(0, self.ui.noteContentTable.height())
+        self.ui.noteContentTable.setColumnWidth(0, self.ui.noteContentTable.width())
+        self.current_editor = webview
+
+    @Slot()
+    def change_2_rich_text_editor(self):
+        if isinstance(self.current_editor, QWebEngineView):
+            # 替换 UI 中组件
+            current_widget = self.ui.noteContentTable.cellWidget(0, 0)
+            if current_widget:
+                current_widget.setParent(None)
+            # 富文本框
+            self.rich_text_editor = RichTextEdit(self)
+            # 监听文件改动 只要文件改动就进行保存
+            self.rich_text_editor.textChanged.connect(self.auto_save_note)
+            self.rich_text_editor.selectionChanged.connect(self.update_format)
+
+            # Add editor to noteContentTable
+            self.ui.noteContentTable.setCellWidget(0, 0, self.rich_text_editor)
+            # default editor is rich text editor
+            self.current_editor = self.rich_text_editor  # 默认
+        # 回传这个组件给file_load 用来更新他们的组件
+        sm.received_rich_text_signal.emit(self.rich_text_editor)
 
 
 

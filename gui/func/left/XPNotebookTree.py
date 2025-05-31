@@ -15,14 +15,15 @@ from gui.func.utils.json_utils import JsonEditor
 from gui.func.utils.tools_utils import (read_parent_id, create_metadata_file_under_dir,
                                         create_metadata_dir_under_dir, scan_supported_files)
 from gui.func.left.CustomTreeItemDelegate import CustomTreeItemDelegate
-from gui.func.utils.file_loader import load_file
+from gui.func.utils.file_loader import file_loader
 class XPNotebookTree(QWidget):
     def __init__(self, path, rich_text_edit=None, parent=None):
         super().__init__(parent)
         self.custom_path = os.path.expanduser(path)
         # 接收这个富文本框的参数属性
         self.rich_text_edit = rich_text_edit
-
+        # 需要加载的四种格式
+        self.supported_exts = ['pdf', 'docx', 'txt', 'epub']
         # 图标资源
         self.folder_closed_icon = QIcon(QPixmap(":images/folder-orange.png"))
         self.folder_open_icon = QIcon(QPixmap(":images/folder-orange-open.png"))
@@ -65,7 +66,7 @@ class XPNotebookTree(QWidget):
                     #  也允许子文件结构（懒加载子节点）
                     file_item.addChild(QTreeWidgetItem())  # 懒加载标记
 
-                elif content_type == "epub":
+                elif content_type in self.supported_exts:
                     # 处理 epub 文件类型
                     pdf_item = QTreeWidgetItem(parent_item)
                     pdf_item.setText(0, os.path.splitext(name)[0])
@@ -193,12 +194,12 @@ class XPNotebookTree(QWidget):
         sm.send_current_file_path_2_main_richtext_signal.emit(file_path, 'left')
 
         # 支持加载的类型：pdf、docx、txt、epub
-        supported_exts = ['pdf', 'docx', 'txt', 'epub']
-        if  content_type in supported_exts:
+        if  content_type in self.supported_exts:
             # 扫面这个目录下的文件然后找到符合文件名字的路径
-            exts_file_path = scan_supported_files(file_path,supported_exts)
+            exts_file_path = scan_supported_files(file_path,self.supported_exts)
             # 加载支持的文件类型（PDF、Word、TXT、EPUB）
-            load_file(exts_file_path, self.rich_text_edit)
+            loader_ = file_loader(exts_file_path, self.rich_text_edit)
+            loader_.load_file()
 
         if content_type == "file" and self.rich_text_edit:
             file_path = os.path.join(file_path, ".note.html")
@@ -394,6 +395,7 @@ class XPNotebookTree(QWidget):
             item.setIcon(0, self.file_icon)
         else:
             item.setIcon(0, QIcon())  # 默认
+
 
 
 
