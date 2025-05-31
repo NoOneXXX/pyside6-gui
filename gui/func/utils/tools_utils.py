@@ -67,6 +67,15 @@ def create_metadata_dir_under_dir(file_path ):
     if not os.path.exists(metadata_path):
         editor.write(metadata_path)
 
+# 扫描这个路径下面的文件名字 并且找到这个文件
+def scan_supported_files(path, exts):
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            ext = os.path.splitext(file)[1].lower().lstrip('.')
+            if ext in exts:
+                return os.path.join(root, file)
+
+
 if __name__ == '__main__':
     remp = read_parent_id('C:/Users/Dell/Desktop/temp/log/test6')
     print(remp)

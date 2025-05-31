@@ -106,3 +106,52 @@ QComboBox QAbstractItemView {
     background-color: #ffffff;
     selection-background-color: #a0cfff;
 }
+
+/* 所有控件默认圆角、淡灰色、留白 */
+
+QWidget {
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    font-size: 11pt;
+    background-color: #F8F9FA;
+    color: #333333;
+}
+
+QTreeWidget {
+    background-color: #ffffff;
+    border: 1px solid #DDDDDD;
+    border-radius: 10px;
+    padding: 6px;
+}
+
+QHeaderView::section {
+    background-color: #F1F3F5;
+    padding: 4px;
+    border: none;
+    border-bottom: 1px solid #CCCCCC;
+    font-weight: bold;
+}
+
+QTableWidget {
+    background-color: #ffffff;
+    border: 1px solid #CCCCCC;
+    border-radius: 10px;
+}
+
+QTextEdit {
+    background-color: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #CCCCCC;
+    padding: 8px;
+}
+
+/* toolbar 按钮 hover 效果 */
+QToolButton:hover {
+    background-color: #E8F0FE;
+    border-radius: 6px;
+}
+
+QPushButton {
+    border-radius: 6px;
+    background-color: #E9ECEF;
+    padding: 5px 12px;
+}

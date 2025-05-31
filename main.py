@@ -1,8 +1,11 @@
 import os
-import re
 import sys
 
+from PySide6.QtWebEngineCore import QWebEngineSettings
+from PySide6.QtWebEngineWidgets import QWebEngineView
+
 from gui.func.utils.json_utils import JsonEditor
+from gui.func.utils.read_pdf_epud_txt_word_type.read_pdf import PDFPreviewer
 # Import the resource file to register the resources
 # 这个文件的引用不能删除 否则下面的图片就会找不到文件
 from gui.ui import resource_rc
@@ -34,11 +37,15 @@ from gui.func.right_top_corner.XPTreeRightTop import XPTreeRightTop
 from gui.func.right_bottom_corner.RichTextEdit import RichTextEdit
 from gui.func.top_menu.file_action import FileActions
 from gui.func.singel_pkg.single_manager import sm
+from gui.func.utils.constants import FONT_SIZES
 try:
     import sip
 except ImportError:
     sip = None
 from gui.func.under_top_menu.color_picker import ColorPickerTool
+import shutil
+from urllib.parse import quote
+
 # Custom Qt message handler for debugging
 def qt_message_handler(msg_type: QtMsgType, context, msg: str):
     print(f"Qt Message [{msg_type}]: {msg} ({context.file}:{context.line})")
@@ -70,13 +77,17 @@ class MainWindow(QMainWindow):
 
         # 绑定这个展示树状图的方法
         sm.left_tree_structure_rander_after_create_new_notebook_signal.connect(self.xp_tree_widget_)
+
         # 绑定又上角-------------------------------------------
+        self.ui.noteTreeContainer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
         # 设置 layout，如果没有则添加
         if self.ui.noteTreeContainer.layout() is None:
             self.layout = QVBoxLayout(self.ui.noteTreeContainer)
         else:
             self.layout = self.ui.noteTreeContainer.layout()
-
+        self.layout.setContentsMargins(0, 0, 0, 0)  # 必须加
+        self.layout.setSpacing(0)
         # 清除旧内容
         for i in reversed(range(self.layout.count())):
             item = self.layout.itemAt(i)
@@ -86,6 +97,7 @@ class MainWindow(QMainWindow):
 
         # 加载 XPNotebookTree 右上角的树
         tree = XPTreeRightTop("")
+        tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 设置扩展策略
         self.layout.addWidget(tree)
         # 绑定又上角-----------------结束--------------------------
 
@@ -101,7 +113,12 @@ class MainWindow(QMainWindow):
 
         # Add editor to noteContentTable
         self.ui.noteContentTable.setCellWidget(0, 0, self.rich_text_editor)
-
+        # default editor is rich text editor
+        self.current_editor = self.rich_text_editor  # 默认
+        # 方法绑定 渲染pdf的时候转换引擎
+        sm.send_pdf_path_2_main_signal.connect(self.replace_rictEditor_2_QWebEngineView)
+        # 当pdf那边转换的了渲染引擎后 要重新换回来
+        sm.change_web_engine_2_richtext_signal.connect(self.change_2_rich_text_editor)
         # Adjust table size
         self.ui.noteContentTable.setRowHeight(0, self.ui.noteContentTable.height())
         self.ui.noteContentTable.setColumnWidth(0, self.ui.noteContentTable.width())
@@ -110,6 +127,11 @@ class MainWindow(QMainWindow):
         self.ui.noteContentTable.horizontalHeader().setStretchLastSection(True)
         self.ui.noteContentTable.verticalHeader().setStretchLastSection(True)
 
+        # Ensure the cell widget (RichTextEdit) fits perfectly
+        self.ui.noteContentTable.setRowHeight(0, self.ui.noteContentTable.height())
+        self.ui.noteContentTable.setColumnWidth(0, self.ui.noteContentTable.width())
+        # Remove any default margins in the table
+        self.ui.noteContentTable.setContentsMargins(0, 0, 0, 0)
         self.path = None
 
         self.status = QStatusBar()
@@ -117,10 +139,30 @@ class MainWindow(QMainWindow):
 
         # 初始化功能类
         self.file_actions = FileActions(self)  # 传入 self 以便弹窗等能绑定主窗口
+        self.ui.menuFile.setStyleSheet("""
+            QMenu {
+                background-color: #ffffff;
+                color: #000000;
+                border: 1px solid #ccc;
+                border-radius: 8px;  /* 设置圆角半径 */
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 6px 24px;
+                border-radius: 4px;  /* 给 item 也加圆角，避免选中时遮住菜单圆角 */
+            }
+            QMenu::item:selected {
+                background-color: #cce8ff;  /* 浅蓝色 */
+                border-radius: 4px;
+            }
+        """)
+
         # 创建笔记
         self.ui.menuFile.addAction(self.file_actions.create_file_action())
         # 打开笔记
         self.ui.menuFile.addAction(self.file_actions.open_notebook_action())
+        # 打开最近的笔记本
+        self.ui.menuFile.addAction(self.file_actions.open_recent_notebook_action())
 
 
         save_file_action = QAction(
@@ -236,9 +278,13 @@ class MainWindow(QMainWindow):
         format_toolbar.addWidget(self.fonts)
 
         # Define font sizes locally since constants.FONT_SIZES is unavailable
-        FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 36]
+
         self.fontsize = QComboBox()
         self.fontsize.addItems([str(s) for s in FONT_SIZES])
+        # 设置默认选项为 14
+        self.fontsize.setCurrentText("14")
+        # 设置富文本初始字体大小为 14
+        self.rich_text_editor.setFontPointSize(14)
         self.fontsize.currentTextChanged.connect(
             lambda s: self.rich_text_editor.setFontPointSize(float(s))
         )
@@ -344,6 +390,20 @@ class MainWindow(QMainWindow):
         format_group.addAction(self.alignr_action)
         format_group.addAction(self.alignj_action)
 
+        color_toolbar = QToolBar("Color")
+        color_toolbar.setIconSize(QSize(16, 16))
+        self.addToolBar(color_toolbar)
+        color_menu = self.menuBar().addMenu("&Format")
+        self.bold_action = QAction(
+            QIcon(":/images/edit-bold.png"), "Bold", self
+        )
+        self.bold_action.setStatusTip("Bold")
+        self.bold_action.setShortcut(QKeySequence.StandardKey.Bold)
+        self.bold_action.setCheckable(True)
+        self.bold_action.triggered.connect(self.toggle_bold)
+        color_toolbar.addAction(self.bold_action)
+        color_menu.addAction(self.bold_action)
+
         # Add search box and button
         search_widget = QWidget()
         search_layout = QHBoxLayout(search_widget)
@@ -356,8 +416,8 @@ class MainWindow(QMainWindow):
         # Add a spacer widget to push search_widget to the right
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        format_toolbar.addWidget(spacer)
-        format_toolbar.addWidget(search_widget)
+        color_toolbar.addWidget(spacer)
+        # color_toolbar.addWidget(search_widget)
 
         self._format_actions = [
             self.fonts,
@@ -612,16 +672,49 @@ class MainWindow(QMainWindow):
     @Slot(str, str)
     def receiver_path(self,path_, flag):
         self.richtext_saved_path = path_
-        print('------------------->', self.richtext_saved_path)
         # 右上角的数据渲染
         # 获取父目录 只有左侧的树状图点击的时候才会显示 右上角的结构 防止右上角的点击出现循环
         if 'left' == flag:
             # 清空 noteTreeContainer 中旧的 XPNotebookTree（右上角）
             self.clear_layout(self.layout)
             tree = XPTreeRightTop(path_,rich_text_edit=self.rich_text_editor)
+            tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  #  设置扩展策略
             self.layout.addWidget(tree)
 
+    # 动态的加载pdf
+    @Slot(str)
+    def replace_rictEditor_2_QWebEngineView(self, file_path):
+        previewer = PDFPreviewer()
+        webview = previewer.get_webview(file_path)
 
+        # 替换 UI 中组件
+        current_widget = self.ui.noteContentTable.cellWidget(0, 0)
+        if current_widget:
+            current_widget.setParent(None)
+        self.ui.noteContentTable.setCellWidget(0, 0, webview)
+        self.ui.noteContentTable.setRowHeight(0, self.ui.noteContentTable.height())
+        self.ui.noteContentTable.setColumnWidth(0, self.ui.noteContentTable.width())
+        self.current_editor = webview
+
+    @Slot()
+    def change_2_rich_text_editor(self):
+        if isinstance(self.current_editor, QWebEngineView):
+            # 替换 UI 中组件
+            current_widget = self.ui.noteContentTable.cellWidget(0, 0)
+            if current_widget:
+                current_widget.setParent(None)
+            # 富文本框
+            self.rich_text_editor = RichTextEdit(self)
+            # 监听文件改动 只要文件改动就进行保存
+            self.rich_text_editor.textChanged.connect(self.auto_save_note)
+            self.rich_text_editor.selectionChanged.connect(self.update_format)
+
+            # Add editor to noteContentTable
+            self.ui.noteContentTable.setCellWidget(0, 0, self.rich_text_editor)
+            # default editor is rich text editor
+            self.current_editor = self.rich_text_editor  # 默认
+        # 回传这个组件给file_load 用来更新他们的组件
+        sm.received_rich_text_signal.emit(self.rich_text_editor)
 
 
 

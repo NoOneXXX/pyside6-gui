@@ -19,6 +19,7 @@
     <file alias="edit-alignment-justify.png">../images/edit-alignment-justify.png</file>
     <file alias="disk--pencil.png">../images/disk--pencil.png</file>
     <file alias="blue-folder-open-document.png">../images/blue-folder-open-document.png</file>
+    <file alias="question.png">../images/question.png</file>
 
     <file alias="folder-orange.png">../images/tree/folder-orange.png</file>
     <file alias="folder-orange-open.png">../images/tree/folder-orange-open.png</file>
@@ -31,5 +32,6 @@
     <file alias="book-open.png">../images/tree/book-open.png</file>
     <file alias="minus-square.svg">../images/tree/minus-square.svg</file>
     <file alias="plus-square.svg">../images/tree/plus-square.svg</file>
+    <file alias="e-book.png">../images/tree/e-book.png</file>
   </qresource>
 </RCC>

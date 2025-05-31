@@ -57,13 +57,25 @@ class JsonEditor:
     读取json文件的内容
     '''
     def read_notebook_if_dir(self, folder_path):
-        meta_path = os.path.join(folder_path, ".metadata.json")
-        if not os.path.exists(meta_path):
-            return "未知笔记"
+        if folder_path is not None:
+            meta_path = os.path.join(folder_path, ".metadata.json")
+            if not os.path.exists(meta_path):
+                return "未知笔记"
 
-        with open(meta_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get("node", {}).get("detail_info", {}).get("content_type", "")
+            with open(meta_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("node", {}).get("detail_info", {}).get("content_type", "")
+
+    '''读取这文件的detail_info信息'''
+    def read_file_metadata_infos(self, folder_path):
+        if folder_path is not None:
+            meta_path = os.path.join(folder_path, ".metadata.json")
+            if not os.path.exists(meta_path):
+                return "未知笔记"
+
+            with open(meta_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("node", {}).get("detail_info", {})
 
 if __name__ == '__main__':
     # 使用示例
