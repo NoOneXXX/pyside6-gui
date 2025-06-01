@@ -21,11 +21,12 @@ class file_loader():
             with open(self.file_path, 'r', encoding='utf-8') as f:
                 self.rich_text_edit.setPlainText(f.read())
     
-        elif ext == '.docx':
-            sm.change_web_engine_2_richtext_signal.emit()
-            doc = Document(self.file_path)
-            full_text = "\n".join([para.text for para in doc.paragraphs])
-            self.rich_text_edit.setPlainText(full_text)
+        elif ext == '.docx' or ext == '.doc':
+            sm.send_pdf_path_2_main_signal.emit(self.file_path)
+            # sm.change_web_engine_2_richtext_signal.emit()
+            # doc = Document(self.file_path)
+            # full_text = "\n".join([para.text for para in doc.paragraphs])
+            # self.rich_text_edit.setPlainText(full_text)
     
         elif ext == '.pdf':
             sm.send_pdf_path_2_main_signal.emit(self.file_path)
@@ -42,6 +43,5 @@ class file_loader():
     '''
     @Slot(QObject)
     def get_rich_text(self , rich_text_edit):
-        print("print this success---->",rich_text_edit)
         self.rich_text_edit = rich_text_edit
 

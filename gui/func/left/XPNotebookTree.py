@@ -1,6 +1,8 @@
 import re
 import uuid
 import time
+
+from gui.func.right_bottom_corner.RichTextEdit import RichTextEdit
 from gui.ui import resource_rc
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QTreeWidget,
@@ -29,6 +31,7 @@ class XPNotebookTree(QWidget):
         self.folder_open_icon = QIcon(QPixmap(":images/folder-orange-open.png"))
         self.file_icon = QIcon(QPixmap(":images/note-violet.png"))
         self.e_book_icon = QIcon(QPixmap(":images/e-book.png"))
+        sm.received_rich_text_2_left_click_signal.connect(self.rich_text_edit_received)
 
         self.tree = None
         self.setup_ui()
@@ -177,6 +180,8 @@ class XPNotebookTree(QWidget):
     左键点击的方法实现
     '''
     def on_item_clicked(self, item):
+        # 触发这个更新富文本框的信号
+        sm.change_web_engine_2_richtext_signal.emit()
         # 这个是在点击的时候将树状图给展开和合并
         if item.childCount() > 0:
             if item.isExpanded():
@@ -395,6 +400,13 @@ class XPNotebookTree(QWidget):
             item.setIcon(0, self.file_icon)
         else:
             item.setIcon(0, QIcon())  # 默认
+
+    '''
+    接收这个富文本框 重新渲染
+    '''
+    @Slot(RichTextEdit)
+    def rich_text_edit_received(self, rich_text):
+        self.rich_text_edit = rich_text
 
 
 

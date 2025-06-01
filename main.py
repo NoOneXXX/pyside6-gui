@@ -6,6 +6,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from gui.func.utils.json_utils import JsonEditor
 from gui.func.utils.read_pdf_epud_txt_word_type.read_pdf import PDFPreviewer
+from gui.func.utils.read_pdf_epud_txt_word_type.read_docx import read_word
 # Import the resource file to register the resources
 # 这个文件的引用不能删除 否则下面的图片就会找不到文件
 from gui.ui import resource_rc
@@ -684,8 +685,16 @@ class MainWindow(QMainWindow):
     # 动态的加载pdf
     @Slot(str)
     def replace_rictEditor_2_QWebEngineView(self, file_path):
-        previewer = PDFPreviewer()
-        webview = previewer.get_webview(file_path)
+        #获取后缀
+        webview = None
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == '.pdf':
+            previewer = PDFPreviewer()
+            webview = previewer.get_webview(file_path)
+        else:
+            # 这个是渲染word文件
+            docx_ = read_word(file_path)
+            webview = docx_.render_word_to_webview()
 
         # 替换 UI 中组件
         current_widget = self.ui.noteContentTable.cellWidget(0, 0)
@@ -715,6 +724,9 @@ class MainWindow(QMainWindow):
             self.current_editor = self.rich_text_editor  # 默认
         # 回传这个组件给file_load 用来更新他们的组件
         sm.received_rich_text_signal.emit(self.rich_text_editor)
+
+        # 回传这个参数给left 左侧的树点击事件
+        sm.received_rich_text_2_left_click_signal.emit(self.rich_text_editor)
 
 
 

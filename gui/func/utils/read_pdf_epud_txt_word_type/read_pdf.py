@@ -10,7 +10,6 @@ from PySide6.QtCore import QUrl
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
 
-
 class PDFPreviewer:
     def __init__(self, viewer_base_dir="gui/func/utils/pdfjs/web"):
         self.viewer_dir = os.path.abspath(viewer_base_dir)
