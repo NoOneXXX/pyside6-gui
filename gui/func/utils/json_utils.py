@@ -17,12 +17,13 @@ class JsonEditor:
                     "modified_time": 1734057255,
                     "content_type": "dir",
                     "created_time": 1734057255,
-                    "info_sort_dir": 1,
                     "title": "java interview",
                     "order": 1,
                     "info_sort": "order",
                     "bg_color": "",
-                    "dir_icon": "",
+                    "open_dir_icon": ":images/folder-orange-open.png",
+                    "close_dir_icon": ":images/folder-orange.png",
+                    "adds_on_icon": "",
                     "font_color": ""
                 }
             }

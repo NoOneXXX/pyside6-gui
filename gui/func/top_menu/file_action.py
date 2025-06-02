@@ -203,6 +203,11 @@ class FileActions:
         data['node']['detail_info']['created_time'] = timestamp
         folder_name = os.path.basename(file_path)  # 创建名字
         data['node']['detail_info']['title'] = folder_name
+        if 'trash' == folder_name:
+            data['node']['detail_info']['content_type'] = 'dir'
+            data['node']['detail_info']['open_dir_icon'] = ':images/trash.png'
+            # 关闭的文件icon
+            data['node']['detail_info']['close_dir_icon'] = ':images/trash.png'
 
         # 写入到原文件或新文件
         metadata_path = os.path.join(file_path, ".metadata.json")

@@ -34,7 +34,7 @@ class XPNotebookTree(QWidget):
         self.supported_exts = ['pdf', 'docx', 'txt', 'epub']
         # 图标资源
         self.folder_closed_icon = QIcon(QPixmap(":images/folder-orange.png"))
-        self.folder_open_icon = QIcon(QPixmap(":images/folder-orange-open.png"))
+
         self.file_icon = QIcon(QPixmap(":images/note-violet.png"))
         self.e_book_icon = QIcon(QPixmap(":images/e-book.png"))
         sm.received_rich_text_2_left_click_signal.connect(self.rich_text_edit_received)
@@ -49,19 +49,14 @@ class XPNotebookTree(QWidget):
                 # 判断这个文件夹是不是文件 读取它下面的json配置
                 editor = JsonEditor()
                 content_type = editor.read_notebook_if_dir(full_path)
-
+                # 读取detail_info的信息
+                detail_info = editor.read_file_metadata_infos(full_path)
                 if 'dir' == content_type:
                     folder_item = QTreeWidgetItem(parent_item)
                     folder_item.setText(0, name)
 
-                    if name.lower() == "python":
-                        icon = QIcon(QPixmap(":images/folder-orange.png"))
-                    elif name in ("我的垃圾桶", "trash"):
-                        icon = QIcon(QPixmap(":images/trash.png"))
-                    else:
-                        icon = self.folder_closed_icon
-
-                    folder_item.setIcon(0, icon)
+                    self.set_item_icon(folder_item, content_type, 'collapsed', detail_info)
+                    # folder_item.setIcon(0, icon)
                     folder_item.setFont(0, QFont("Microsoft YaHei", 12))
 
                     # 懒加载标记项
@@ -82,6 +77,9 @@ class XPNotebookTree(QWidget):
                     pdf_item.setIcon(0, self.e_book_icon)  # 用你自己的 epub 图标路径
                     pdf_item.setData(0, Qt.UserRole, full_path)
                     pdf_item.addChild(QTreeWidgetItem())  # 懒加载标记
+
+
+
 
         except PermissionError:
             pass
@@ -379,36 +377,57 @@ class XPNotebookTree(QWidget):
             item = item.parent()
         return os.path.join(self.custom_path, *parts)
 
+    '''
+    打开文件夹
+    '''
     def handle_item_expanded(self, item):
         path = item.data(0, Qt.UserRole)
 
         editor = JsonEditor()
         content_type = editor.read_notebook_if_dir(path)
-        self.set_item_icon(item, content_type)
+        # 读取detail_info的信息
+        detail_info = editor.read_file_metadata_infos(path)
+        self.set_item_icon(item, content_type, 'expanded' , detail_info)
 
         if item.childCount() == 1 and item.child(0).text(0) == "":
             item.takeChild(0)
             path = item.data(0, Qt.UserRole)
             if path:
                 self.populate_tree(item, path)
-
-
+    '''
+    关闭文件夹
+    '''
     def handle_item_collapsed(self, item):
-        # item.setIcon(0, self.folder_closed_icon)
         path = item.data(0, Qt.UserRole)
         editor = JsonEditor()
         content_type = editor.read_notebook_if_dir(path)
-        self.set_item_icon(item, content_type)
+        # 读取detail_info的信息
+        detail_info = editor.read_file_metadata_infos(path)
+        self.set_item_icon(item, content_type, 'collapsed', detail_info)
     '''
     进行封装 如果是文件夹就用文件夹的图标 文件就用文件的图标
+    exps 是展开还是关闭
+    detail_info 就是元数据的详细信息
     '''
-    def set_item_icon(self, item, content_type):
-        if content_type == "dir":
-            item.setIcon(0, self.folder_closed_icon)
-        elif content_type == "file":
-            item.setIcon(0, self.file_icon)
+    def set_item_icon(self, item, content_type, exps, detail_infos):
+
+        # 关闭
+        if 'collapsed' == exps:
+            if content_type == "dir" or content_type == "file":
+                colla_icon = detail_infos['close_dir_icon']
+                item.setIcon(0,  QIcon(QPixmap(colla_icon)))
+            else:
+                colla_icon = detail_infos['adds_on_icon']
+                item.setIcon(0, QIcon(QPixmap(colla_icon)))
         else:
-            item.setIcon(0, QIcon())  # 默认
+            if content_type == "dir" or content_type == "file":
+                colla_icon = detail_infos['open_dir_icon']
+                item.setIcon(0,  QIcon(QPixmap(colla_icon)))
+            else:
+                colla_icon = detail_infos['adds_on_icon']
+                item.setIcon(0, QIcon(QPixmap(colla_icon)))
+
+
 
     '''
     接收这个富文本框 重新渲染
@@ -448,7 +467,8 @@ class XPNotebookTree(QWidget):
                 new_item = QTreeWidgetItem()
                 new_item.setText(0, file_name)
                 new_item.setIcon(0, self.file_icon)
-                new_item.setData(0, Qt.UserRole, file_path)
+                # 这里修改文件路径为新的文件路径这样第一次读取的时候才不会报错
+                new_item.setData(0, Qt.UserRole, target_file_path)
                 new_item.setData(0, Qt.UserRole + 1, True)  # 标记“刚创建”
                 # new_item.setFlags(new_item.flags() | Qt.ItemIsEditable)
                 # new_item.addChild(QTreeWidgetItem())
@@ -465,6 +485,7 @@ class XPNotebookTree(QWidget):
         else:
             # 取消选择
             pass
+
 
 
 
