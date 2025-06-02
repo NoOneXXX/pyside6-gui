@@ -2,7 +2,6 @@
 import os
 
 from PySide6.QtCore import Slot, QObject
-from docx import Document
 from .read_pdf_epud_txt_word_type.read_epud import read_epud_to_richtext
 from gui.func.singel_pkg.single_manager import sm
 
@@ -23,10 +22,6 @@ class file_loader():
     
         elif ext == '.docx' or ext == '.doc':
             sm.send_pdf_path_2_main_signal.emit(self.file_path)
-            # sm.change_web_engine_2_richtext_signal.emit()
-            # doc = Document(self.file_path)
-            # full_text = "\n".join([para.text for para in doc.paragraphs])
-            # self.rich_text_edit.setPlainText(full_text)
     
         elif ext == '.pdf':
             sm.send_pdf_path_2_main_signal.emit(self.file_path)

@@ -6,7 +6,7 @@ from gui.func.right_bottom_corner.RichTextEdit import RichTextEdit
 from gui.ui import resource_rc
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QTreeWidget,
-    QTreeWidgetItem, QStyleFactory, QMessageBox, QHeaderView, QMenu, QInputDialog
+    QTreeWidgetItem, QStyleFactory, QMessageBox, QHeaderView, QMenu, QInputDialog, QFileDialog
 )
 from PySide6.QtGui import QIcon, QPixmap, QFont, QPalette, QColor, QAction, QImage, QTextDocument
 from PySide6.QtCore import Qt, Slot, QUrl
@@ -18,6 +18,12 @@ from gui.func.utils.tools_utils import (read_parent_id, create_metadata_file_und
                                         create_metadata_dir_under_dir, scan_supported_files)
 from gui.func.left.CustomTreeItemDelegate import CustomTreeItemDelegate
 from gui.func.utils.file_loader import file_loader
+from pathlib import Path
+import shutil
+
+
+
+
 class XPNotebookTree(QWidget):
     def __init__(self, path, rich_text_edit=None, parent=None):
         super().__init__(parent)
@@ -72,7 +78,7 @@ class XPNotebookTree(QWidget):
                 elif content_type in self.supported_exts:
                     # 处理 epub 文件类型
                     pdf_item = QTreeWidgetItem(parent_item)
-                    pdf_item.setText(0, os.path.splitext(name)[0])
+                    pdf_item.setText(0, name)
                     pdf_item.setIcon(0, self.e_book_icon)  # 用你自己的 epub 图标路径
                     pdf_item.setData(0, Qt.UserRole, full_path)
                     pdf_item.addChild(QTreeWidgetItem())  # 懒加载标记
@@ -232,18 +238,20 @@ class XPNotebookTree(QWidget):
         create_file_action = QAction(QIcon(":images/open.png"), "创建子文件", self)
         create_dir_action = QAction(QIcon(":images/open.png"), "创建文件夹", self)
         delete_action = QAction(QIcon(":images/open.png"), "删除", self)
+        adds_on_action = QAction(QIcon(":images/open.png"), "添加附件", self)
         # 方法绑定
         open_action.triggered.connect(lambda: self.open_item(item))
         rename_action.triggered.connect(lambda: self.rename_item(item))
         create_file_action.triggered.connect(lambda: self.create_file_item(item))
         create_dir_action.triggered.connect(lambda: self.create_dir_action(item))
         delete_action.triggered.connect(lambda: self.delete_item(item))
+        adds_on_action.triggered.connect(lambda: self.adds_on_item(item))
         # 方法绑定 结束
         menu.addAction(open_action)
         menu.addAction(rename_action)
         menu.addAction(create_file_action)
         menu.addAction(create_dir_action)
-
+        menu.addAction(adds_on_action)
 
         menu.addAction(delete_action)
         # 右键点击的样式 封装到了文件的最底端
@@ -251,6 +259,18 @@ class XPNotebookTree(QWidget):
 
         menu.exec(self.tree.viewport().mapToGlobal(point))
 
+    '''
+    这个更新是防止懒加载的时候因为重命名导致加载失败
+    因为他会找原来的路径名
+    '''
+    def _update_child_user_roles(self, item, old_base, new_base):
+        for i in range(item.childCount()):
+            child = item.child(i)
+            old_child_path = child.data(0, Qt.UserRole)
+            if old_child_path:
+                new_child_path = old_child_path.replace(old_base, new_base, 1)
+                child.setData(0, Qt.UserRole, new_child_path)
+            self._update_child_user_roles(child, old_base, new_base)
 
     def open_item(self, item):
         path = self.get_item_path(item)
@@ -276,18 +296,7 @@ class XPNotebookTree(QWidget):
         item.setData(0, Qt.UserRole, new_path)
         self._update_child_user_roles(item, old_path, new_path)
 
-    '''
-        这个更新是防止懒加载的时候因为重命名导致加载失败
-        因为他会找原来的路径名
-        '''
-    def _update_child_user_roles(self, item, old_base, new_base):
-        for i in range(item.childCount()):
-            child = item.child(i)
-            old_child_path = child.data(0, Qt.UserRole)
-            if old_child_path:
-                new_child_path = old_child_path.replace(old_base, new_base, 1)
-                child.setData(0, Qt.UserRole, new_child_path)
-            self._update_child_user_roles(child, old_base, new_base)
+
 
     def delete_item(self, item):
         print(f"删除: {item.text(0)}")
@@ -407,6 +416,57 @@ class XPNotebookTree(QWidget):
     @Slot(RichTextEdit)
     def rich_text_edit_received(self, rich_text):
         self.rich_text_edit = rich_text
+
+    '''
+    右键点击
+    添加附件
+    '''
+    def adds_on_item(self, item):
+        # 弹出文件选择框（默认打开当前目录）
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "请选择文件",
+            ".",  # 默认打开目录
+            "所有文件 (*);;PDF 文件 (*.pdf);;文本文件 (*.txt)"
+        )
+        # 选择了文件
+        if file_path:
+            # 获取路径
+            base_dir_path = item.data(0, Qt.UserRole)
+            try:
+                # 获取文件名 并且创建这个文件夹
+                file_name = os.path.basename(file_path)
+                target_file_path = os.path.join(base_dir_path, file_name)
+                os.makedirs(target_file_path, exist_ok=True)
+                # 扩展名（不含点） pdf
+                ext_types = Path(file_path).suffix.lstrip('.')
+                # file_path.suffix 含有标点 .pdf
+                create_metadata_file_under_dir(target_file_path, ext_types)
+                # 复制这个文件到新的文件夹下面
+                shutil.copy(file_path, target_file_path)
+
+                new_item = QTreeWidgetItem()
+                new_item.setText(0, file_name)
+                new_item.setIcon(0, self.file_icon)
+                new_item.setData(0, Qt.UserRole, file_path)
+                new_item.setData(0, Qt.UserRole + 1, True)  # 标记“刚创建”
+                # new_item.setFlags(new_item.flags() | Qt.ItemIsEditable)
+                # new_item.addChild(QTreeWidgetItem())
+
+                item.addChild(new_item)
+                item.setExpanded(True)
+
+                self.tree.setCurrentItem(new_item)
+                self.tree.editItem(new_item, 0)
+
+            except Exception as e:
+                QMessageBox.critical(self, "创建失败", f"无法创建文件:\n{e}")
+
+        else:
+            # 取消选择
+            pass
+
+
 
 
 
