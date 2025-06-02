@@ -56,7 +56,6 @@ class XPNotebookTree(QWidget):
                     folder_item.setText(0, name)
 
                     self.set_item_icon(folder_item, content_type, 'collapsed', detail_info)
-                    # folder_item.setIcon(0, icon)
                     folder_item.setFont(0, QFont("Microsoft YaHei", 12))
 
                     # 懒加载标记项
@@ -77,9 +76,6 @@ class XPNotebookTree(QWidget):
                     pdf_item.setIcon(0, self.e_book_icon)  # 用你自己的 epub 图标路径
                     pdf_item.setData(0, Qt.UserRole, full_path)
                     pdf_item.addChild(QTreeWidgetItem())  # 懒加载标记
-
-
-
 
         except PermissionError:
             pass
@@ -410,7 +406,6 @@ class XPNotebookTree(QWidget):
     detail_info 就是元数据的详细信息
     '''
     def set_item_icon(self, item, content_type, exps, detail_infos):
-
         # 关闭
         if 'collapsed' == exps:
             if content_type == "dir" or content_type == "file":
