@@ -59,7 +59,8 @@ class XPNotebookTree(QWidget):
                     folder_item.setFont(0, QFont("Microsoft YaHei", 12))
 
                     # 懒加载标记项
-                    folder_item.addChild(QTreeWidgetItem())
+                    if detail_info.get('has_children', False):
+                        folder_item.addChild(QTreeWidgetItem())
                     folder_item.setData(0, Qt.UserRole, full_path)
                 elif content_type == "file":
                     file_item = QTreeWidgetItem(parent_item)
@@ -67,7 +68,8 @@ class XPNotebookTree(QWidget):
                     file_item.setIcon(0, self.file_icon)
                     file_item.setData(0, Qt.UserRole, full_path)
                     #  也允许子文件结构（懒加载子节点）
-                    file_item.addChild(QTreeWidgetItem())  # 懒加载标记
+                    if detail_info.get('has_children', False):
+                        file_item.addChild(QTreeWidgetItem())  # 懒加载标记
 
                 elif content_type in self.supported_exts:
                     # 处理 epub 文件类型
@@ -75,7 +77,8 @@ class XPNotebookTree(QWidget):
                     pdf_item.setText(0, name)
                     pdf_item.setIcon(0, self.e_book_icon)  # 用你自己的 epub 图标路径
                     pdf_item.setData(0, Qt.UserRole, full_path)
-                    pdf_item.addChild(QTreeWidgetItem())  # 懒加载标记
+                    if detail_info.get('has_children', False):
+                        pdf_item.addChild(QTreeWidgetItem())  # 懒加载标记
 
         except PermissionError:
             pass
@@ -140,7 +143,8 @@ class XPNotebookTree(QWidget):
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self.on_context_menu)
         ## 右键点击事件增加结束
-
+        #展开树
+        self.tree.expandAll()
         # 左键点击事件 点击的时候就展开 不是只有点击前面的加号减号才展开
         self.tree.itemClicked.connect(self.on_item_clicked)
         self.tree.setItemDelegate(CustomTreeItemDelegate())
@@ -309,6 +313,14 @@ class XPNotebookTree(QWidget):
             return
 
         try:
+
+            # 将它的父类改成has_childer true 这个可以在创建的时候是否有子集
+            editor = JsonEditor()
+            editor_data = editor.read_node_infos(dir_path)
+            editor_data['node']['detail_info']['has_children'] = True
+            meta_path = os.path.join(dir_path, ".metadata.json")
+            editor.writeByData(meta_path,editor_data)
+
             os.makedirs(file_path, exist_ok=True)
             create_metadata_file_under_dir(file_path)
             note_path = os.path.join(file_path, ".note.html")
@@ -332,6 +344,9 @@ class XPNotebookTree(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "创建失败", f"无法创建文件:\n{e}")
 
+    def change_tag(data):
+        data['node']['detail_info']['tag'] = 'new_tag'  # Add a new field
+        return data
     '''
     创建文件夹
     '''
@@ -345,6 +360,14 @@ class XPNotebookTree(QWidget):
             return
 
         try:
+            # 将它的父类改成has_childer true 这个可以在创建的时候是否有子集
+            editor = JsonEditor()
+            editor_data = editor.read_node_infos(dir_path)
+            editor_data['node']['detail_info']['has_children'] = True
+            meta_path = os.path.join(dir_path, ".metadata.json")
+            editor.writeByData(meta_path, editor_data)
+
+
             os.makedirs(file_path, exist_ok=True)
             create_metadata_dir_under_dir(file_path)
 

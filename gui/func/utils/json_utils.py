@@ -18,6 +18,7 @@ class JsonEditor:
                     "content_type": "dir",
                     "created_time": 1734057255,
                     "title": "java interview",
+                    "has_children": False,
                     "order": 1,
                     "info_sort": "order",
                     "bg_color": "",
@@ -42,6 +43,12 @@ class JsonEditor:
         target = Path(output_path)
         with target.open('w', encoding='utf-8') as f:
             json.dump(self.data, f, indent=4, ensure_ascii=False)
+        return self
+
+    def writeByData(self, output_path=None, data=None):
+        """写入到文件，output_path 为空则覆盖原文件"""
+        self.data = data
+        self.write(output_path)
         return self
 
     def get_data(self):
@@ -77,6 +84,18 @@ class JsonEditor:
             with open(meta_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 return data.get("node", {}).get("detail_info", {})
+
+
+    '''读取node的节点'''
+    def read_node_infos(self, folder_path):
+        if folder_path is not None:
+            meta_path = os.path.join(folder_path, ".metadata.json")
+            if not os.path.exists(meta_path):
+                return "未知笔记"
+
+            with open(meta_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data
 
 if __name__ == '__main__':
     # 使用示例
