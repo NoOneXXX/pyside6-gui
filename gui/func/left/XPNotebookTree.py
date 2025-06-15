@@ -48,9 +48,11 @@ class XPNotebookTree(QWidget):
                 full_path = os.path.join(path, name)
                 # 判断这个文件夹是不是文件 读取它下面的json配置
                 editor = JsonEditor()
-                content_type = editor.read_notebook_if_dir(full_path)
                 # 读取detail_info的信息
                 detail_info = editor.read_file_metadata_infos(full_path)
+                content_type = ''
+                if detail_info:
+                    content_type = detail_info.get('content_type', None)
                 if 'dir' == content_type:
                     folder_item = QTreeWidgetItem(parent_item)
                     folder_item.setText(0, name)

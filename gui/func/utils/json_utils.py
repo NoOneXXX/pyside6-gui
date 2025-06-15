@@ -79,7 +79,7 @@ class JsonEditor:
         if folder_path is not None:
             meta_path = os.path.join(folder_path, ".metadata.json")
             if not os.path.exists(meta_path):
-                return "未知笔记"
+                return None
 
             with open(meta_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
