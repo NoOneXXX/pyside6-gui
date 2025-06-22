@@ -42,6 +42,8 @@ def create_metadata_file_under_dir(file_path , content_type = 'file'):
     data['node']['detail_info']['open_dir_icon'] = ':images/note-violet.png'
     # 关闭的文件icon
     data['node']['detail_info']['close_dir_icon'] = ':images/note-violet.png'
+    if content_type.find('attachfile') != -1:
+        data['node']['detail_info']['adds_on_icon'] = ":images/attach-file.png"
     # 写入到原文件或新文件
     metadata_path = os.path.join(file_path, ".metadata.json")
     if not os.path.exists(metadata_path):
