@@ -39,9 +39,9 @@ def create_metadata_file_under_dir(file_path , content_type = 'file'):
     parent_id = read_parent_id(file_path)
     data['node']['detail_info']['parent_id'] = parent_id
     # 打开的文件icon
-    data['node']['detail_info']['open_dir_icon'] = ':images/note-violet.png'
+    data['node']['detail_info']['open_dir_icon'] = ':images/attach-file.png'
     # 关闭的文件icon
-    data['node']['detail_info']['close_dir_icon'] = ':images/note-violet.png'
+    data['node']['detail_info']['close_dir_icon'] = ':images/attach-file.png'
     # 写入到原文件或新文件
     metadata_path = os.path.join(file_path, ".metadata.json")
     if not os.path.exists(metadata_path):
@@ -49,7 +49,7 @@ def create_metadata_file_under_dir(file_path , content_type = 'file'):
 '''
 创建metadata.json文件 文件是dir类型
 '''
-def create_metadata_dir_under_dir(file_path ):
+def create_metadata_dir_under_dir(file_path , content_type = 'dir'):
     # 3. 创建空文件 .metadata.json
     # 创建编辑器并加载
     editor = JsonEditor().load()
@@ -61,7 +61,7 @@ def create_metadata_dir_under_dir(file_path ):
     timestamp = int(time.time())  # 创建时间
     data['node']['detail_info']['created_time'] = timestamp
     # 创建文件类型 这里是创建的文件
-    data['node']['detail_info']['content_type'] = 'dir'
+    data['node']['detail_info']['content_type'] = content_type
     folder_name = os.path.basename(file_path)  # 创建名字
     data['node']['detail_info']['title'] = folder_name
     parent_id = read_parent_id(file_path)

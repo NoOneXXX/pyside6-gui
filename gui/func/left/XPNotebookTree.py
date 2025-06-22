@@ -18,8 +18,8 @@ from gui.func.utils.tools_utils import (read_parent_id, create_metadata_file_und
                                         create_metadata_dir_under_dir, scan_supported_files)
 from gui.func.left.CustomTreeItemDelegate import CustomTreeItemDelegate
 from gui.func.utils.file_loader import file_loader
-from pathlib import Path
-import shutil
+from ..utils import copy_and_overwrite
+
 
 
 
@@ -31,12 +31,12 @@ class XPNotebookTree(QWidget):
         # 接收这个富文本框的参数属性
         self.rich_text_edit = rich_text_edit
         # 需要加载的四种格式
-        self.supported_exts = ['pdf', 'docx', 'txt', 'epub']
+        self.supported_exts = ['pdf', 'docx', 'txt', 'epub','attachfile']
         # 图标资源
         self.folder_closed_icon = QIcon(QPixmap(":images/folder-orange.png"))
 
         self.file_icon = QIcon(QPixmap(":images/note-violet.png"))
-        self.e_book_icon = QIcon(QPixmap(":images/e-book.png"))
+        self.attach_file = QIcon(QPixmap(":images/attach-file.png"))
         sm.received_rich_text_2_left_click_signal.connect(self.rich_text_edit_received)
 
         self.tree = None
@@ -77,7 +77,7 @@ class XPNotebookTree(QWidget):
                     # 处理 epub 文件类型
                     pdf_item = QTreeWidgetItem(parent_item)
                     pdf_item.setText(0, name)
-                    pdf_item.setIcon(0, self.e_book_icon)  # 用你自己的 epub 图标路径
+                    pdf_item.setIcon(0, self.attach_file)  # 用你自己的 epub 图标路径
                     pdf_item.setData(0, Qt.UserRole, full_path)
                     if detail_info.get('has_children', False):
                         pdf_item.addChild(QTreeWidgetItem())  # 懒加载标记
@@ -473,20 +473,28 @@ class XPNotebookTree(QWidget):
             # 获取路径
             base_dir_path = item.data(0, Qt.UserRole)
             try:
+                # 将它的父类改成has_childer true 这个可以在创建的时候是否有子集
+                editor = JsonEditor()
+                editor_data = editor.read_node_infos(base_dir_path)
+                editor_data['node']['detail_info']['has_children'] = True
+                meta_path = os.path.join(base_dir_path, ".metadata.json")
+                editor.writeByData(meta_path, editor_data)
+
+
                 # 获取文件名 并且创建这个文件夹
                 file_name = os.path.basename(file_path)
                 target_file_path = os.path.join(base_dir_path, file_name)
                 os.makedirs(target_file_path, exist_ok=True)
-                # 扩展名（不含点） pdf
-                ext_types = Path(file_path).suffix.lstrip('.')
+                # # 扩展名（不含点） pdf
+                # ext_types = Path(file_path).suffix.lstrip('.')
                 # file_path.suffix 含有标点 .pdf
-                create_metadata_file_under_dir(target_file_path, ext_types)
+                create_metadata_file_under_dir(target_file_path, 'attachfile')
                 # 复制这个文件到新的文件夹下面
-                shutil.copy(file_path, target_file_path)
+                copy_and_overwrite(file_path, target_file_path)
 
                 new_item = QTreeWidgetItem()
                 new_item.setText(0, file_name)
-                new_item.setIcon(0, self.file_icon)
+                new_item.setIcon(0, self.attach_file)
                 # 这里修改文件路径为新的文件路径这样第一次读取的时候才不会报错
                 new_item.setData(0, Qt.UserRole, target_file_path)
                 new_item.setData(0, Qt.UserRole + 1, True)  # 标记“刚创建”
@@ -505,6 +513,7 @@ class XPNotebookTree(QWidget):
         else:
             # 取消选择
             pass
+
 
 
 

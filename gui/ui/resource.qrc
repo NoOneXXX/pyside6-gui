@@ -25,6 +25,9 @@
     <file alias="folder-orange-open.png">../images/tree/folder-orange-open.png</file>
     <file alias="note.png">../images/tree/note.png</file>
     <file alias="trash.png">../images/tree/trash.png</file>
+    <file alias="garbage.png">../images/tree/garbage.png</file>
+    <file alias="attach-file.png">../images/tree/attach-file.png</file>
+
     <file alias="open.png">../images/tree/open.png</file>
     <file alias="grandidier.jpg">../images/tree/grandidier.jpg</file>
     <file alias="note-violet.png">../images/tree/note-violet.png</file>

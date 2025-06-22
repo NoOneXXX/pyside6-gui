@@ -13,7 +13,6 @@ import sys
 import os
 from gui.func.singel_pkg.single_manager import sm
 from gui.func.utils.json_utils import JsonEditor
-from gui.func.utils.tools_utils import read_parent_id, create_metadata_file_under_dir, create_metadata_dir_under_dir
 from gui.func.left.CustomTreeItemDelegate import CustomTreeItemDelegate
 from PySide6.QtCore import QTimer
 
@@ -57,7 +56,7 @@ class XPTreeRightTop(QWidget):
 
                     icon = (QIcon(QPixmap(":images/folder-orange.png"))
                             if name.lower() == "python" else
-                            QIcon(QPixmap(":images/trash.png"))
+                            QIcon(QPixmap(":images/garbage.png"))
                             if name in ("我的垃圾桶", "trash")
                             else self.folder_closed_icon)
 

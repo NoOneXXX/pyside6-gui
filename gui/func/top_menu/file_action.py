@@ -12,7 +12,7 @@ from gui.data.NoteDB import NoteDB
 from gui.func.singel_pkg.single_manager import sm
 # 这个文件的引用不能删除 否则下面的图片就会找不到文件
 from gui.ui import resource_rc
-
+from ..utils import check_file_dir_exist
 
 '''
 file文件的事件操作和处理
@@ -20,13 +20,18 @@ file文件的事件操作和处理
 class FileActions:
     def __init__(self, parent=None):
         self.parent = parent  # 通常是 QMainWindow，用来绑定对话框等
-        self.note_db = None
         # 默认打开最近一次笔记本
-        note_db = NoteDB("recent_notebooks.db")
-        if note_db:
-            list_path = note_db.get_recent_notebooks(1)
+        self.note_db = NoteDB("recent_notebooks.db")
+        if self.note_db:
+            list_path = self.note_db.get_recent_notebooks()
             if list_path:
-                sm.left_tree_structure_rander_after_create_new_notebook_signal.emit(list_path[0])
+                for str_temps in list_path:
+                    print(str_temps)
+                    if check_file_dir_exist(str_temps):
+                        sm.left_tree_structure_rander_after_create_new_notebook_signal.emit(str_temps)
+                        break
+                    else:
+                        self.note_db.delete_recent_notebook(str_temps)
 
     '''
     创建笔记本的action
@@ -72,10 +77,10 @@ class FileActions:
 
         # 创建子菜单（即最近文件路径列表）
         recent_menu = QMenu(self.parent)
-        note_db = NoteDB("recent_notebooks.db")
 
         # 加载最近的笔记本
-        recent_paths = note_db.get_recent_notebooks(15)
+        self.note_db = NoteDB("recent_notebooks.db")
+        recent_paths = self.note_db.get_recent_notebooks(15)
         recent_menu.setStyleSheet("""
             QMenu {
                 background-color: #ffffff;
@@ -111,12 +116,16 @@ class FileActions:
     def open_recent_notebook_path(self, path):
         if path and os.path.exists(path):
             metadata_path = os.path.join(path, ".metadata.json")
-            if not os.path.exists(metadata_path):
+            if not check_file_dir_exist(metadata_path):
+                # 失败了就删除
+                self.note_db.delete_recent_notebook(metadata_path)
                 QMessageBox.warning(self.parent, "打开失败", "该目录不是有效的笔记本")
                 return
 
             sm.left_tree_structure_rander_after_create_new_notebook_signal.emit(path)
         else:
+            # 失败了就删除
+            self.note_db.delete_recent_notebook(path)
             QMessageBox.warning(self.parent, "打开失败", "路径不存在")
 
     '''打开最近笔记本的函数'''
