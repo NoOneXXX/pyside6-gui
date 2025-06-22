@@ -1,6 +1,7 @@
 import re
 import uuid
 import time
+from pathlib import Path
 
 from gui.func.right_bottom_corner.RichTextEdit import RichTextEdit
 from gui.ui import resource_rc
@@ -31,7 +32,7 @@ class XPNotebookTree(QWidget):
         # 接收这个富文本框的参数属性
         self.rich_text_edit = rich_text_edit
         # 需要加载的四种格式
-        self.supported_exts = ['pdf', 'docx', 'txt', 'epub','attachfile']
+        self.supported_exts = ['attachfile_pdf', 'attachfile_docx', 'attachfile_txt', 'attachfile_epub']
         # 图标资源
         self.folder_closed_icon = QIcon(QPixmap(":images/folder-orange.png"))
 
@@ -50,7 +51,7 @@ class XPNotebookTree(QWidget):
                 editor = JsonEditor()
                 # 读取detail_info的信息
                 detail_info = editor.read_file_metadata_infos(full_path)
-                content_type = ''
+                content_type = '0'
                 if detail_info:
                     content_type = detail_info.get('content_type', None)
                 if 'dir' == content_type:
@@ -73,7 +74,7 @@ class XPNotebookTree(QWidget):
                     if detail_info.get('has_children', False):
                         file_item.addChild(QTreeWidgetItem())  # 懒加载标记
 
-                elif content_type in self.supported_exts:
+                elif content_type.find('attachfile') != -1:
                     # 处理 epub 文件类型
                     pdf_item = QTreeWidgetItem(parent_item)
                     pdf_item.setText(0, name)
@@ -200,7 +201,7 @@ class XPNotebookTree(QWidget):
         file_path = item.data(0, Qt.UserRole)
 
         editor = JsonEditor()
-        content_type = editor.read_notebook_if_dir(file_path)
+        content_type =  editor.read_notebook_if_dir(file_path)
         # 这个是发送地址给main那边 在那边自动保存的时候使用
         sm.send_current_file_path_2_main_richtext_signal.emit(file_path, 'left')
 
@@ -477,6 +478,7 @@ class XPNotebookTree(QWidget):
                 editor = JsonEditor()
                 editor_data = editor.read_node_infos(base_dir_path)
                 editor_data['node']['detail_info']['has_children'] = True
+
                 meta_path = os.path.join(base_dir_path, ".metadata.json")
                 editor.writeByData(meta_path, editor_data)
 
@@ -486,9 +488,9 @@ class XPNotebookTree(QWidget):
                 target_file_path = os.path.join(base_dir_path, file_name)
                 os.makedirs(target_file_path, exist_ok=True)
                 # # 扩展名（不含点） pdf
-                # ext_types = Path(file_path).suffix.lstrip('.')
+                ext_types = Path(file_path).suffix.lstrip('.')
                 # file_path.suffix 含有标点 .pdf
-                create_metadata_file_under_dir(target_file_path, 'attachfile')
+                create_metadata_file_under_dir(target_file_path, 'attachfile_' + ext_types)
                 # 复制这个文件到新的文件夹下面
                 copy_and_overwrite(file_path, target_file_path)
 
