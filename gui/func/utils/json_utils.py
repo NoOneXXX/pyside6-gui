@@ -20,6 +20,7 @@ class JsonEditor:
                     "title": "java interview",
                     "has_children": False,
                     "order": 1,
+                    "max_order_num_by_child_dir":0,
                     "info_sort": "order",
                     "bg_color": "",
                     "open_dir_icon": ":images/folder-orange-open.png",

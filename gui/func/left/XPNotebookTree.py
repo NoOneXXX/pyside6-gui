@@ -37,6 +37,7 @@ class XPNotebookTree(QWidget):
         self.folder_closed_icon = QIcon(QPixmap(":images/folder-orange.png"))
 
         self.file_icon = QIcon(QPixmap(":images/note-violet.png"))
+        # 附件图片
         self.attach_file = QIcon(QPixmap(":images/attach-file.png"))
         sm.received_rich_text_2_left_click_signal.connect(self.rich_text_edit_received)
 
@@ -45,6 +46,7 @@ class XPNotebookTree(QWidget):
 
     def populate_tree(self, parent_item, path):
         try:
+            items = []
             for name in os.listdir(path):
                 full_path = os.path.join(path, name)
                 # 判断这个文件夹是不是文件 读取它下面的json配置
@@ -52,36 +54,54 @@ class XPNotebookTree(QWidget):
                 # 读取detail_info的信息
                 detail_info = editor.read_file_metadata_infos(full_path)
                 content_type = '0'
+                order_dir = 0
                 if detail_info:
                     content_type = detail_info.get('content_type', None)
+                    # 获取到order的值
+                    order_dir = detail_info.get('order', None)
+                # 获取
                 if 'dir' == content_type:
-                    folder_item = QTreeWidgetItem(parent_item)
-                    folder_item.setText(0, name)
-
+                    # 封装这个树
+                    folder_item = QTreeWidgetItem()
                     self.set_item_icon(folder_item, content_type, 'collapsed', detail_info)
                     folder_item.setFont(0, QFont("Microsoft YaHei", 12))
-
+                    folder_item.setData(0, Qt.UserRole, full_path)
+                    folder_item.setData(0, Qt.UserRole + 2, order_dir)
+                    folder_item.setText(0, name)
+                    # 加入到集合
+                    items.append((folder_item, order_dir))
                     # 懒加载标记项
                     if detail_info.get('has_children', False):
                         folder_item.addChild(QTreeWidgetItem())
-                    folder_item.setData(0, Qt.UserRole, full_path)
                 elif content_type == "file":
-                    file_item = QTreeWidgetItem(parent_item)
-                    file_item.setText(0, os.path.splitext(name)[0])
-                    file_item.setIcon(0, self.file_icon)
-                    file_item.setData(0, Qt.UserRole, full_path)
+                    # 封装这个树
+                    folder_item = QTreeWidgetItem()
+                    folder_item.setData(0, Qt.UserRole, full_path)
+                    folder_item.setData(0, Qt.UserRole + 2, order_dir)
+                    folder_item.setText(0, os.path.splitext(name)[0])
+                    folder_item.setIcon(0, self.file_icon)
+                    # 加入到集合
+                    items.append((folder_item, order_dir))
                     #  也允许子文件结构（懒加载子节点）
                     if detail_info.get('has_children', False):
-                        file_item.addChild(QTreeWidgetItem())  # 懒加载标记
-
+                        folder_item.addChild(QTreeWidgetItem())  # 懒加载标记
                 elif content_type.find('attachfile') != -1:
                     # 处理 epub 文件类型
-                    pdf_item = QTreeWidgetItem(parent_item)
-                    pdf_item.setText(0, name)
-                    pdf_item.setIcon(0, self.attach_file)  # 用你自己的 epub 图标路径
-                    pdf_item.setData(0, Qt.UserRole, full_path)
+                    # 封装这个树
+                    folder_item = QTreeWidgetItem()
+                    folder_item.setData(0, Qt.UserRole, full_path)
+                    folder_item.setData(0, Qt.UserRole + 2, order_dir)
+                    folder_item.setText(0, name)
+                    folder_item.setIcon(0, self.attach_file)  # 用你自己的 epub 图标路径
+                    # 加入到集合
+                    items.append((folder_item, order_dir))
                     if detail_info.get('has_children', False):
-                        pdf_item.addChild(QTreeWidgetItem())  # 懒加载标记
+                        folder_item.addChild(QTreeWidgetItem())  # 懒加载标记
+
+            # 按 order 排序
+            items.sort(key=lambda x: x[1])
+            for item, _ in items:
+                parent_item.addChild(item)
 
         except PermissionError:
             pass
@@ -257,7 +277,6 @@ class XPNotebookTree(QWidget):
         menu.addAction(delete_action)
         # 右键点击的样式 封装到了文件的最底端
         menu.setStyleSheet(WINDOWS_MENU_STYLE)
-
         menu.exec(self.tree.viewport().mapToGlobal(point))
 
     '''
@@ -314,18 +333,20 @@ class XPNotebookTree(QWidget):
         if os.path.exists(file_path):
             self.create_file_item(item, index + 1)
             return
-
         try:
-
             # 将它的父类改成has_childer true 这个可以在创建的时候是否有子集
             editor = JsonEditor()
             editor_data = editor.read_node_infos(dir_path)
             editor_data['node']['detail_info']['has_children'] = True
+            # 获取到子类最大的值 排序使用
+            max_order_num_by_child_dir = editor_data['node']['detail_info']['max_order_num_by_child_dir']
+            max_order_num_by_child_dir = max_order_num_by_child_dir + 1
+            editor_data['node']['detail_info']['max_order_num_by_child_dir'] = max_order_num_by_child_dir
             meta_path = os.path.join(dir_path, ".metadata.json")
             editor.writeByData(meta_path,editor_data)
 
             os.makedirs(file_path, exist_ok=True)
-            create_metadata_file_under_dir(file_path)
+            create_metadata_file_under_dir(file_path, content_type = 'file', order_file_num = max_order_num_by_child_dir)
             note_path = os.path.join(file_path, ".note.html")
             with open(note_path, "w", encoding="utf-8") as f:
                 f.write("<html></html>")
@@ -340,6 +361,8 @@ class XPNotebookTree(QWidget):
 
             item.addChild(new_item)
             item.setExpanded(True)
+            # 重新排序
+            self.reorder_tree(item,max_order_num_by_child_dir)
 
             self.tree.setCurrentItem(new_item)
             self.tree.editItem(new_item, 0)
@@ -350,6 +373,58 @@ class XPNotebookTree(QWidget):
     def change_tag(data):
         data['node']['detail_info']['tag'] = 'new_tag'  # Add a new field
         return data
+
+    def update_order(self, parent_item):
+        editor = JsonEditor()
+        non_trash_items = []
+        trash_item = None
+
+        # 收集子节点
+        for i in range(parent_item.childCount()):
+            child = parent_item.child(i)
+            path = child.data(0, Qt.UserRole)
+            metadata = editor.read_node_infos(path)
+            is_trash = metadata['node']['detail_info'].get('is_trash', False)
+            if is_trash:
+                trash_item = child
+            else:
+                non_trash_items.append(child)
+
+        # 更新 order 值
+        for i, child in enumerate(non_trash_items):
+            path = child.data(0, Qt.UserRole)
+            metadata = editor.read_node_infos(path)
+            metadata['node']['detail_info']['order'] = i
+            editor.editByData(os.path.join(path, ".metadata.json"), metadata)
+            child.setData(0, Qt.UserRole + 2, i)
+
+        if trash_item:
+            path = trash_item.data(0, Qt.UserRole)
+            metadata = editor.read_node_infos(path)
+            metadata['node']['detail_info']['order'] = 999999
+            editor.editByData(os.path.join(path, ".metadata.json"), metadata)
+            trash_item.setData(0, Qt.UserRole + 2, 999999)
+
+        # 重新排序
+        self.reorder_tree(parent_item)
+
+    '''重新排序'''
+    def reorder_tree(self, parent_item, orders_by_file = 0):
+        items = []
+        for i in range(parent_item.childCount()):
+            item = parent_item.child(i)
+            order = item.data(0, Qt.UserRole + 2) or 0
+            if order == 0:
+                order = orders_by_file
+            items.append((item, order))
+
+        # 按 order 排序
+        items.sort(key=lambda x: x[1])
+
+        # 清空并重新添加
+        parent_item.takeChildren()
+        for item, _e in items:
+            parent_item.addChild(item)
     '''
     创建文件夹
     '''
@@ -367,12 +442,15 @@ class XPNotebookTree(QWidget):
             editor = JsonEditor()
             editor_data = editor.read_node_infos(dir_path)
             editor_data['node']['detail_info']['has_children'] = True
+            # 获取到子类最大的值 排序使用
+            max_order_num_by_child_dir = editor_data['node']['detail_info']['max_order_num_by_child_dir']
+            max_order_num_by_child_dir = max_order_num_by_child_dir + 1
+            editor_data['node']['detail_info']['max_order_num_by_child_dir'] = max_order_num_by_child_dir
             meta_path = os.path.join(dir_path, ".metadata.json")
             editor.writeByData(meta_path, editor_data)
 
-
             os.makedirs(file_path, exist_ok=True)
-            create_metadata_dir_under_dir(file_path)
+            create_metadata_dir_under_dir(file_path,content_type = 'dir', order_file_num = max_order_num_by_child_dir)
 
             # 不刷新，而是手动插入新节点
             new_item = QTreeWidgetItem()
@@ -385,12 +463,15 @@ class XPNotebookTree(QWidget):
 
             item.setExpanded(True)
             item.addChild(new_item)
+            # 重新排序
+            self.reorder_tree(item, max_order_num_by_child_dir)
 
             self.tree.setCurrentItem(new_item)
             self.tree.editItem(new_item, 0)
 
         except Exception as e:
             QMessageBox.critical(self, "创建失败", f"无法创建文件夹:\n{e}")
+
 
     def get_item_path(self, item):
         parts = []
@@ -478,6 +559,10 @@ class XPNotebookTree(QWidget):
                 editor = JsonEditor()
                 editor_data = editor.read_node_infos(base_dir_path)
                 editor_data['node']['detail_info']['has_children'] = True
+                # 获取到子类最大的值 排序使用
+                max_order_num_by_child_dir = editor_data['node']['detail_info']['max_order_num_by_child_dir']
+                max_order_num_by_child_dir = max_order_num_by_child_dir + 1
+                editor_data['node']['detail_info']['max_order_num_by_child_dir'] = max_order_num_by_child_dir
 
                 meta_path = os.path.join(base_dir_path, ".metadata.json")
                 editor.writeByData(meta_path, editor_data)
@@ -490,7 +575,7 @@ class XPNotebookTree(QWidget):
                 # # 扩展名（不含点） pdf
                 ext_types = Path(file_path).suffix.lstrip('.')
                 # file_path.suffix 含有标点 .pdf
-                create_metadata_file_under_dir(target_file_path, 'attachfile_' + ext_types)
+                create_metadata_file_under_dir(target_file_path, 'attachfile_' + ext_types, max_order_num_by_child_dir)
                 # 复制这个文件到新的文件夹下面
                 copy_and_overwrite(file_path, target_file_path)
 
@@ -505,7 +590,7 @@ class XPNotebookTree(QWidget):
 
                 item.addChild(new_item)
                 item.setExpanded(True)
-
+                self.reorder_tree(item, max_order_num_by_child_dir)
                 self.tree.setCurrentItem(new_item)
                 self.tree.editItem(new_item, 0)
 
@@ -515,6 +600,7 @@ class XPNotebookTree(QWidget):
         else:
             # 取消选择
             pass
+
 
 
 

@@ -217,6 +217,7 @@ class FileActions:
             data['node']['detail_info']['open_dir_icon'] = ':images/garbage.png'
             # 关闭的文件icon
             data['node']['detail_info']['close_dir_icon'] = ':images/garbage.png'
+            data['node']['detail_info']['order'] = 9999999
 
         # 写入到原文件或新文件
         metadata_path = os.path.join(file_path, ".metadata.json")

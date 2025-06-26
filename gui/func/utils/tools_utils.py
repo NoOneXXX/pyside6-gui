@@ -21,7 +21,7 @@ def read_parent_id(path):
 '''
 创建metadata.json文件 文件是file类型
 '''
-def create_metadata_file_under_dir(file_path , content_type = 'file'):
+def create_metadata_file_under_dir(file_path , content_type = 'file', order_file_num = 1):
     # 3. 创建空文件 .metadata.json
     # 创建编辑器并加载
     editor = JsonEditor().load()
@@ -42,8 +42,13 @@ def create_metadata_file_under_dir(file_path , content_type = 'file'):
     data['node']['detail_info']['open_dir_icon'] = ':images/note-violet.png'
     # 关闭的文件icon
     data['node']['detail_info']['close_dir_icon'] = ':images/note-violet.png'
+    # 根据父类的文件名字顺序的大小来定义这个文件的顺序
+    data['node']['detail_info']['max_order_num_by_child_dir'] = 0
+    # 当前文件的排序
+    data['node']['detail_info']['order'] = order_file_num
     if content_type.find('attachfile') != -1:
         data['node']['detail_info']['adds_on_icon'] = ":images/attach-file.png"
+
     # 写入到原文件或新文件
     metadata_path = os.path.join(file_path, ".metadata.json")
     if not os.path.exists(metadata_path):
@@ -51,7 +56,7 @@ def create_metadata_file_under_dir(file_path , content_type = 'file'):
 '''
 创建metadata.json文件 文件是dir类型
 '''
-def create_metadata_dir_under_dir(file_path , content_type = 'dir'):
+def create_metadata_dir_under_dir(file_path , content_type = 'dir', order_file_num = 1):
     # 3. 创建空文件 .metadata.json
     # 创建编辑器并加载
     editor = JsonEditor().load()
@@ -68,6 +73,10 @@ def create_metadata_dir_under_dir(file_path , content_type = 'dir'):
     data['node']['detail_info']['title'] = folder_name
     parent_id = read_parent_id(file_path)
     data['node']['detail_info']['parent_id'] = parent_id
+    # 根据父类的文件名字顺序的大小来定义这个文件的顺序
+    data['node']['detail_info']['max_order_num_by_child_dir'] = 0
+    # 当前文件的排序
+    data['node']['detail_info']['order'] = order_file_num
     # 写入到原文件或新文件
     metadata_path = os.path.join(file_path, ".metadata.json")
     if not os.path.exists(metadata_path):
