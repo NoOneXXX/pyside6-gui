@@ -2,10 +2,9 @@
 import os
 
 from PySide6.QtCore import Slot, QObject
-from docx import Document
 from .read_pdf_epud_txt_word_type.read_epud import read_epud_to_richtext
 from gui.func.singel_pkg.single_manager import sm
-
+from charset_normalizer import from_path
 
 class file_loader():
     def __init__(self, path, rich_text_edit):
@@ -18,14 +17,19 @@ class file_loader():
     
         if ext == '.txt':
             sm.change_web_engine_2_richtext_signal.emit()
-            with open(self.file_path, 'r', encoding='utf-8') as f:
-                self.rich_text_edit.setPlainText(f.read())
-    
-        elif ext == '.docx':
-            sm.change_web_engine_2_richtext_signal.emit()
-            doc = Document(self.file_path)
-            full_text = "\n".join([para.text for para in doc.paragraphs])
-            self.rich_text_edit.setPlainText(full_text)
+            result = from_path(self.file_path).best()
+            if result is None:
+                self.rich_text_edit.setPlainText('无法解析')
+            else:
+                # charset-normalizer 可能返回 utf_16，要转成 Python 支持的格式
+                encoding = result.encoding.replace('_', '-')
+                print(f"检测到编码: {encoding}")
+                with open(self.file_path, 'r', encoding=encoding) as f:
+                    self.rich_text_edit.setPlainText(f.read())
+
+
+        elif ext == '.docx' or ext == '.doc':
+            sm.send_pdf_path_2_main_signal.emit(self.file_path)
     
         elif ext == '.pdf':
             sm.send_pdf_path_2_main_signal.emit(self.file_path)
@@ -42,6 +46,5 @@ class file_loader():
     '''
     @Slot(QObject)
     def get_rich_text(self , rich_text_edit):
-        print("print this success---->",rich_text_edit)
         self.rich_text_edit = rich_text_edit
 

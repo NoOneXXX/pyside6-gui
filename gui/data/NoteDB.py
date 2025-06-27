@@ -47,13 +47,20 @@ class NoteDB:
         self.conn.commit()
 
     '''获取这个笔记本'''
-    def get_recent_notebooks(self, limit=5):
+    def get_recent_notebooks(self, limit=15):
         cursor = self.conn.execute('''
             SELECT path FROM recent_notebooks
             ORDER BY last_opened_time DESC
             LIMIT ?
         ''', (limit,))
         return [row[0] for row in cursor.fetchall()]
+
+    '''删除这个最近的笔记本 如果找不到就删除'''
+    def delete_recent_notebook(self, path):
+        self.conn.execute('''
+                    DELETE  FROM recent_notebooks WHERE path = ?
+                ''', (path,))
+        self.conn.commit()
 
 
 

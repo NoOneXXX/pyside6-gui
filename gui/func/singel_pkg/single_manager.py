@@ -13,6 +13,8 @@ class SignalManager(QObject):
     change_web_engine_2_richtext_signal = Signal()
     # 接收回传的富文本框对象 这里要传送的是RichTextEdit对象
     received_rich_text_signal = Signal(QObject)
+    # 接收回传的富文本框对象 这里要传送的是RichTextEdit对象 左侧树的点击事件使用
+    received_rich_text_2_left_click_signal = Signal(QObject)
 
 #创建实例来调用这个方法
 sm = SignalManager()
