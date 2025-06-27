@@ -3,6 +3,7 @@ import uuid
 import time
 from pathlib import Path
 
+from gui.func.left.dropItemEvent import CustomTreeWidget
 from gui.func.right_bottom_corner.RichTextEdit import RichTextEdit
 from gui.ui import resource_rc
 from PySide6.QtWidgets import (
@@ -119,7 +120,9 @@ class XPNotebookTree(QWidget):
         # header.setStyleSheet("background-color: #F0F0F0; padding: 2px; font-weight: bold;")
         # layout.addWidget(header)
 
-        self.tree = QTreeWidget()
+        # self.tree = QTreeWidget()
+        self.tree = CustomTreeWidget()  # 使用自定义树控件
+        self.tree.notebook_tree = self  # 绑定 XPNotebookTree 实例
         self.tree.setColumnCount(1)
         self.tree.setHeaderHidden(True)
         self.tree.setRootIsDecorated(True)
@@ -384,8 +387,8 @@ class XPNotebookTree(QWidget):
             child = parent_item.child(i)
             path = child.data(0, Qt.UserRole)
             metadata = editor.read_node_infos(path)
-            is_trash = metadata['node']['detail_info'].get('is_trash', False)
-            if is_trash:
+            is_trash = metadata['node']['detail_info'].get('title', '')
+            if 'trash' == is_trash:
                 trash_item = child
             else:
                 non_trash_items.append(child)
@@ -395,15 +398,15 @@ class XPNotebookTree(QWidget):
             path = child.data(0, Qt.UserRole)
             metadata = editor.read_node_infos(path)
             metadata['node']['detail_info']['order'] = i
-            editor.editByData(os.path.join(path, ".metadata.json"), metadata)
+            editor.writeByData(os.path.join(path, ".metadata.json"), metadata)
             child.setData(0, Qt.UserRole + 2, i)
 
-        if trash_item:
-            path = trash_item.data(0, Qt.UserRole)
-            metadata = editor.read_node_infos(path)
-            metadata['node']['detail_info']['order'] = 999999
-            editor.editByData(os.path.join(path, ".metadata.json"), metadata)
-            trash_item.setData(0, Qt.UserRole + 2, 999999)
+        # if trash_item:
+        #     path = trash_item.data(0, Qt.UserRole)
+        #     metadata = editor.read_node_infos(path)
+        #     metadata['node']['detail_info']['order'] = 999999
+        #     editor.writeByData(os.path.join(path, ".metadata.json"), metadata)
+        #     trash_item.setData(0, Qt.UserRole + 2, 999999)
 
         # 重新排序
         self.reorder_tree(parent_item)
@@ -585,11 +588,10 @@ class XPNotebookTree(QWidget):
                 # 这里修改文件路径为新的文件路径这样第一次读取的时候才不会报错
                 new_item.setData(0, Qt.UserRole, target_file_path)
                 new_item.setData(0, Qt.UserRole + 1, True)  # 标记“刚创建”
-                # new_item.setFlags(new_item.flags() | Qt.ItemIsEditable)
-                # new_item.addChild(QTreeWidgetItem())
 
                 item.addChild(new_item)
                 item.setExpanded(True)
+                # 重新排序
                 self.reorder_tree(item, max_order_num_by_child_dir)
                 self.tree.setCurrentItem(new_item)
                 self.tree.editItem(new_item, 0)
@@ -601,7 +603,67 @@ class XPNotebookTree(QWidget):
             # 取消选择
             pass
 
+    '''拖拽的重写函数'''
+    def handle_drop(self, dragged_item, parent_item, target_item, drop_pos):
+        try:
+            # 获取父节点路径
+            parent_path = self.custom_path if parent_item is None or parent_item == self.tree.invisibleRootItem() else parent_item.data(0, Qt.UserRole)
+            dragged_path = dragged_item.data(0, Qt.UserRole)
+            dragged_name = os.path.basename(dragged_path)
+            new_path = os.path.join(parent_path, dragged_name)
 
+            # 防止重名
+            if os.path.exists(new_path):
+                QMessageBox.warning(self, "拖拽失败", "目标路径已存在同名文件/文件夹")
+                return
+
+            # 移动文件/文件夹
+            os.rename(dragged_path, new_path)
+
+            # 更新拖拽节点的路径和元数据
+            dragged_item.setData(0, Qt.UserRole, new_path)
+            self._update_child_user_roles(dragged_item, dragged_path, new_path)
+
+            editor = JsonEditor()
+            # 更新拖拽节点的 parent_id 和 order
+            dragged_metadata = editor.read_node_infos(new_path)
+            dragged_metadata['node']['detail_info']['parent_id'] = read_parent_id(parent_path)
+            # 分配新的 order 值（使用 max_order_num_by_child_dir + 1）
+            parent_metadata = editor.read_node_infos(parent_path)
+            max_order_num = parent_metadata['node']['detail_info'].get('max_order_num_by_child_dir', 0)
+            dragged_metadata['node']['detail_info']['order'] = max_order_num + 1
+            dragged_item.setData(0, Qt.UserRole + 1, True)  # 标记为新节点
+            dragged_item.setData(0, Qt.UserRole + 2, max_order_num + 1)
+            editor.writeByData(os.path.join(new_path, ".metadata.json"), dragged_metadata)
+
+            # 更新父节点的 has_children 和 max_order_num_by_child_dir
+            parent_metadata['node']['detail_info']['has_children'] = True
+            parent_metadata['node']['detail_info']['max_order_num_by_child_dir'] = max_order_num + 1
+            editor.writeByData(os.path.join(parent_path, ".metadata.json"), parent_metadata)
+
+            # 将拖拽节点添加到新父节点
+            if dragged_item.parent():
+                dragged_item.parent().takeChild(dragged_item.parent().indexOfChild(dragged_item))
+            parent_item.addChild(dragged_item)
+
+            # 更新 order 值并重新排序
+            self.update_order(parent_item)
+            self.reorder_tree(parent_item)
+
+            # 强制刷新树控件
+            self.tree.viewport().update()
+
+            # 如果父节点已展开，重新加载子节点
+            # if parent_item.isExpanded():
+            parent_item.takeChildren()
+            self.populate_tree(parent_item, parent_path)
+
+            # 高亮拖拽后的节点
+            self.tree.setCurrentItem(dragged_item)
+            self.tree.scrollToItem(dragged_item)
+
+        except Exception as e:
+            QMessageBox.critical(self, "拖拽失败", f"无法完成拖拽操作:\n{e}")
 
 
 
