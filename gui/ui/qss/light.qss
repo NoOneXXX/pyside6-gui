@@ -155,3 +155,35 @@ QPushButton {
     background-color: #E9ECEF;
     padding: 5px 12px;
 }
+
+QMessageBox {
+    background-color: #ffffff;
+    border: 2px solid #ff4d4d;
+    border-radius: 8px;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    font-size: 11pt;
+    padding: 15px;
+}
+QMessageBox QLabel {
+    color: #ff4d4d;
+    padding: 10px;
+    qproperty-alignment: AlignCenter;
+}
+QMessageBox QPushButton {
+    background-color: #ffffff;
+    border: 1px solid #ff4d4d;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 10pt;
+    color: #ff4d4d;
+    min-width: 80px;
+}
+QMessageBox QPushButton:hover {
+    background-color: #ff4d4d;
+    color: #ffffff;
+    border: 1px solid #ff4d4d;
+}
+QMessageBox QPushButton:pressed {
+    background-color: #cc0000;
+    color: #ffffff;
+}

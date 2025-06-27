@@ -20,7 +20,7 @@ from gui.func.utils.tools_utils import (read_parent_id, create_metadata_file_und
                                         create_metadata_dir_under_dir, scan_supported_files)
 from gui.func.left.CustomTreeItemDelegate import CustomTreeItemDelegate
 from gui.func.utils.file_loader import file_loader
-from ..utils import copy_and_overwrite
+from ..utils import copy_and_overwrite,get_parent_path
 
 
 
@@ -44,68 +44,6 @@ class XPNotebookTree(QWidget):
 
         self.tree = None
         self.setup_ui()
-
-    def populate_tree(self, parent_item, path):
-        try:
-            items = []
-            for name in os.listdir(path):
-                full_path = os.path.join(path, name)
-                # 判断这个文件夹是不是文件 读取它下面的json配置
-                editor = JsonEditor()
-                # 读取detail_info的信息
-                detail_info = editor.read_file_metadata_infos(full_path)
-                content_type = '0'
-                order_dir = 0
-                if detail_info:
-                    content_type = detail_info.get('content_type', None)
-                    # 获取到order的值
-                    order_dir = detail_info.get('order', None)
-                # 获取
-                if 'dir' == content_type:
-                    # 封装这个树
-                    folder_item = QTreeWidgetItem()
-                    self.set_item_icon(folder_item, content_type, 'collapsed', detail_info)
-                    folder_item.setFont(0, QFont("Microsoft YaHei", 12))
-                    folder_item.setData(0, Qt.UserRole, full_path)
-                    folder_item.setData(0, Qt.UserRole + 2, order_dir)
-                    folder_item.setText(0, name)
-                    # 加入到集合
-                    items.append((folder_item, order_dir))
-                    # 懒加载标记项
-                    if detail_info.get('has_children', False):
-                        folder_item.addChild(QTreeWidgetItem())
-                elif content_type == "file":
-                    # 封装这个树
-                    folder_item = QTreeWidgetItem()
-                    folder_item.setData(0, Qt.UserRole, full_path)
-                    folder_item.setData(0, Qt.UserRole + 2, order_dir)
-                    folder_item.setText(0, os.path.splitext(name)[0])
-                    folder_item.setIcon(0, self.file_icon)
-                    # 加入到集合
-                    items.append((folder_item, order_dir))
-                    #  也允许子文件结构（懒加载子节点）
-                    if detail_info.get('has_children', False):
-                        folder_item.addChild(QTreeWidgetItem())  # 懒加载标记
-                elif content_type.find('attachfile') != -1:
-                    # 处理 epub 文件类型
-                    # 封装这个树
-                    folder_item = QTreeWidgetItem()
-                    folder_item.setData(0, Qt.UserRole, full_path)
-                    folder_item.setData(0, Qt.UserRole + 2, order_dir)
-                    folder_item.setText(0, name)
-                    folder_item.setIcon(0, self.attach_file)  # 用你自己的 epub 图标路径
-                    # 加入到集合
-                    items.append((folder_item, order_dir))
-                    if detail_info.get('has_children', False):
-                        folder_item.addChild(QTreeWidgetItem())  # 懒加载标记
-
-            # 按 order 排序
-            items.sort(key=lambda x: x[1])
-            for item, _ in items:
-                parent_item.addChild(item)
-
-        except PermissionError:
-            pass
 
     def setup_ui(self):
         if not os.path.exists(self.custom_path):
@@ -175,6 +113,68 @@ class XPNotebookTree(QWidget):
         self.tree.itemClicked.connect(self.on_item_clicked)
         self.tree.setItemDelegate(CustomTreeItemDelegate())
         self.tree.itemChanged.connect(self.on_item_renamed)
+
+    def populate_tree(self, parent_item, path):
+        try:
+            items = []
+            for name in os.listdir(path):
+                full_path = os.path.join(path, name)
+                # 判断这个文件夹是不是文件 读取它下面的json配置
+                editor = JsonEditor()
+                # 读取detail_info的信息
+                detail_info = editor.read_file_metadata_infos(full_path)
+                content_type = '0'
+                order_dir = 0
+                if detail_info:
+                    content_type = detail_info.get('content_type', None)
+                    # 获取到order的值
+                    order_dir = detail_info.get('order', None)
+                # 获取
+                if 'dir' == content_type:
+                    # 封装这个树
+                    folder_item = QTreeWidgetItem()
+                    self.set_item_icon(folder_item, content_type, 'collapsed', detail_info)
+                    folder_item.setFont(0, QFont("Microsoft YaHei", 12))
+                    folder_item.setData(0, Qt.UserRole, full_path)
+                    folder_item.setData(0, Qt.UserRole + 2, order_dir)
+                    folder_item.setText(0, name)
+                    # 加入到集合
+                    items.append((folder_item, order_dir))
+                    # 懒加载标记项
+                    if detail_info.get('has_children', False):
+                        folder_item.addChild(QTreeWidgetItem())
+                elif content_type == "file":
+                    # 封装这个树
+                    folder_item = QTreeWidgetItem()
+                    folder_item.setData(0, Qt.UserRole, full_path)
+                    folder_item.setData(0, Qt.UserRole + 2, order_dir)
+                    folder_item.setText(0, os.path.splitext(name)[0])
+                    folder_item.setIcon(0, self.file_icon)
+                    # 加入到集合
+                    items.append((folder_item, order_dir))
+                    #  也允许子文件结构（懒加载子节点）
+                    if detail_info.get('has_children', False):
+                        folder_item.addChild(QTreeWidgetItem())  # 懒加载标记
+                elif content_type.find('attachfile') != -1:
+                    # 处理 epub 文件类型
+                    # 封装这个树
+                    folder_item = QTreeWidgetItem()
+                    folder_item.setData(0, Qt.UserRole, full_path)
+                    folder_item.setData(0, Qt.UserRole + 2, order_dir)
+                    folder_item.setText(0, name)
+                    folder_item.setIcon(0, self.attach_file)  # 用你自己的 epub 图标路径
+                    # 加入到集合
+                    items.append((folder_item, order_dir))
+                    if detail_info.get('has_children', False):
+                        folder_item.addChild(QTreeWidgetItem())  # 懒加载标记
+
+            # 按 order 排序
+            items.sort(key=lambda x: x[1])
+            for item, _ in items:
+                parent_item.addChild(item)
+
+        except PermissionError:
+            pass
 
     def on_item_renamed(self, item, column):
         if not item or column != 0:
@@ -380,18 +380,17 @@ class XPNotebookTree(QWidget):
     def update_order(self, parent_item):
         editor = JsonEditor()
         non_trash_items = []
-        trash_item = None
-
         # 收集子节点
         for i in range(parent_item.childCount()):
             child = parent_item.child(i)
             path = child.data(0, Qt.UserRole)
-            metadata = editor.read_node_infos(path)
-            is_trash = metadata['node']['detail_info'].get('title', '')
-            if 'trash' == is_trash:
-                trash_item = child
-            else:
-                non_trash_items.append(child)
+            if path:
+                metadata = editor.read_node_infos(path)
+                is_trash = metadata['node']['detail_info'].get('title', '')
+                if 'trash' == is_trash:
+                    pass
+                else:
+                    non_trash_items.append(child)
 
         # 更新 order 值
         for i, child in enumerate(non_trash_items):
@@ -400,13 +399,6 @@ class XPNotebookTree(QWidget):
             metadata['node']['detail_info']['order'] = i
             editor.writeByData(os.path.join(path, ".metadata.json"), metadata)
             child.setData(0, Qt.UserRole + 2, i)
-
-        # if trash_item:
-        #     path = trash_item.data(0, Qt.UserRole)
-        #     metadata = editor.read_node_infos(path)
-        #     metadata['node']['detail_info']['order'] = 999999
-        #     editor.writeByData(os.path.join(path, ".metadata.json"), metadata)
-        #     trash_item.setData(0, Qt.UserRole + 2, 999999)
 
         # 重新排序
         self.reorder_tree(parent_item)
@@ -608,6 +600,7 @@ class XPNotebookTree(QWidget):
         # try:
         # 获取父节点路径
         parent_path = self.custom_path if parent_item is None or parent_item == self.tree.invisibleRootItem() else parent_item.data(0, Qt.UserRole)
+        # 拖拽的文件路径
         dragged_path = dragged_item.data(0, Qt.UserRole)
         dragged_name = os.path.basename(dragged_path)
         new_path = os.path.join(parent_path, dragged_name)
@@ -644,6 +637,21 @@ class XPNotebookTree(QWidget):
         if dragged_item.parent():
             dragged_item.parent().takeChild(dragged_item.parent().indexOfChild(dragged_item))
         parent_item.addChild(dragged_item)
+
+        # 检查源文件夹内容是否为空
+        dragget_parent_ = get_parent_path(dragged_path)
+        if dragget_parent_:
+            flag_ = False
+            for item in os.listdir(dragget_parent_):
+                # 检查每个项是否为文件夹
+                if os.path.isdir(os.path.join(dragget_parent_, item)):
+                    flag_ = True
+                    break
+            # 如果存在不存在文件夹 那么就将这个父类设置为没有子类
+            if not flag_:
+                dragged_parent_metadata = editor.read_node_infos(dragget_parent_)
+                dragged_parent_metadata['node']['detail_info']['has_children'] = False
+                editor.writeByData(os.path.join(dragget_parent_, ".metadata.json"), dragged_parent_metadata)
 
         # 更新 order 值并重新排序
         self.update_order(parent_item)
