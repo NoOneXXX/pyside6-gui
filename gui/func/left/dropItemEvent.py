@@ -4,7 +4,7 @@
 将拖拽后的文件进行持久化
 '''
 
-from PySide6.QtWidgets import QTreeWidget
+from PySide6.QtWidgets import QTreeWidget,QMessageBox
 
 class CustomTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
@@ -27,6 +27,11 @@ class CustomTreeWidget(QTreeWidget):
 
         # 调用 XPNotebookTree 的 handle_drop 方法
         if self.notebook_tree:
-            self.notebook_tree.handle_drop(dragged_item, parent_item, target_item, drop_pos)
-
-        event.accept()
+            try:
+                self.notebook_tree.handle_drop(dragged_item, parent_item, target_item, drop_pos)
+                event.accept()  # Only accept if handle_drop succeeds
+            except Exception as e:
+                QMessageBox.critical(self, "拖拽失败", f"无法完成拖拽操作:\n{e}")
+                event.ignore()  # Ignore the drop if it fails
+        else:
+            event.ignore()
