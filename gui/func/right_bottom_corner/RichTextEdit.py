@@ -1,11 +1,13 @@
 import os
 import re
 import base64
+import time
+
 from PySide6.QtWidgets import QTextEdit, QMenu, QMessageBox
 from PySide6.QtGui import QImage, QClipboard, QContextMenuEvent, QAction, QTextCharFormat, QFont, QCursor, QIcon, \
     QKeySequence
 from PySide6.QtCore import QMimeData, QBuffer, QByteArray
-
+from gui.func.utils import logger
 ''''
 富文本类设置
 '''
@@ -21,14 +23,14 @@ class RichTextEdit(QTextEdit):
             image = source.imageData()
             if isinstance(image, QImage):
                 if not self.html_file_path:
-                    print("请先设置 html_file_path")
+                    logger.info("请先设置 html_file_path")
                     return
 
                 # 获取 HTML 文件所在目录，用于保存粘贴的图片
                 html_dir = os.path.dirname(self.html_file_path)
-
+                logger.info(f'这个保存的html_dir地址是啥：{html_dir}')
                 # 生成一个唯一的图片文件名
-                img_name = f"pasted_img_{len(os.listdir(html_dir))}.png"
+                img_name = f"pasted_img_{int(time.time() * 1000)}.png"
                 img_path = os.path.join(html_dir, img_name)
 
                 # 保存图片到文件

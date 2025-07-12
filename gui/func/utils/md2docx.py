@@ -66,7 +66,7 @@ class MarkdownToWordApp(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Markdown 转 Word 工具")
-        self.setWindowIcon(QIcon("rabbit.ico"))
+        self.setWindowIcon(QIcon("keepnotesPlus.ico"))
         self.setFixedSize(500, 300)
         self.setStyleSheet("background-color: #f5f7fa; border-radius: 12px;")
 
