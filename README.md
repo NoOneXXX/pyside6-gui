@@ -25,3 +25,8 @@ pyside6-rcc gui/ui/resource.qrc -o gui/ui/resource_rc.py
 ```shell
 python build.py
 ```
+
+### git的代理推送，git默认是不走系统代理的，哪怕你用了clash开启了系统代理模式
+```shell
+git -c http.proxy="http://127.0.0.1:7890" push
+```

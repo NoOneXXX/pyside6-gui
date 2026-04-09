@@ -1,5 +1,7 @@
 # note_db.py
 import sqlite3
+import time
+
 
 class NoteDB:
     def __init__(self, db_path):
@@ -25,6 +27,15 @@ class NoteDB:
                     last_opened_time INTEGER NOT NULL
                 )
             ''')
+
+        # 3. 新增：索引异步任务队列
+        self.conn.execute('''
+                    CREATE TABLE IF NOT EXISTS indexing_queue (
+                        rel_path TEXT PRIMARY KEY,
+                        timestamp INTEGER NOT NULL,
+                        action TEXT DEFAULT 'update'
+                    )
+                ''')
         self.conn.commit()
 
     def insert_note(self, id_, path, title, parent_id, created_time, updated_time):
@@ -70,6 +81,18 @@ class NoteDB:
                     DELETE  FROM recent_notebooks WHERE path = ?
                 ''', (path,))
         self.conn.commit()
+
+    # 添加到索引队列
+    def add_to_index_queue(self, rel_path):
+        self.conn.execute('''
+            INSERT INTO indexing_queue (rel_path, timestamp) 
+            VALUES (?, ?) ON CONFLICT(rel_path) DO UPDATE SET timestamp=excluded.timestamp
+        ''', (rel_path, int(time.time())))
+        self.conn.commit()
+
+    # 获取队列大小
+    def get_queue_size(self):
+        return self.conn.execute('SELECT COUNT(*) FROM indexing_queue').fetchone()[0]
 
 
 

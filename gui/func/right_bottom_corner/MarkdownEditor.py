@@ -32,6 +32,7 @@ from PySide6.QtCore import (
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
 
+from gui.data.NoteDB import NoteDB
 from gui.func.utils import logger
 from gui.func.right_bottom_corner.MarkdownRenderer import render_markdown
 
@@ -845,8 +846,24 @@ class MarkdownEditor(QWidget):
             self.editor.document().setModified(False)
             self.split_editor.document().setModified(False)
 
+
+            # 持久化索引表格
+            db = NoteDB("recent_notebooks.db")
+            indexing_db = NoteDB("indexing_queue.db")
+            # 获取笔记本的根目录
+            list_path = db.get_recent_notebooks(1)
+            if list_path:
+                root_path = list_path[0]
+                rel_path = os.path.relpath(target_path, root_path)
+                # 更新到sqlite表格中
+                indexing_db.add_to_index_queue(rel_path)
+            # 3. 检查是否触发批处理
+            if indexing_db.get_queue_size() >= 10:
+                pass
+
             logger.info(f"Markdown 文件保存成功: {target_path}")
             return True
+
         except Exception as e:
             logger.error(f"保存 Markdown 文件失败: {e}")
             return False
