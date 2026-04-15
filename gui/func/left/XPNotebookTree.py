@@ -157,6 +157,20 @@ class XPNotebookTree(QWidget):
         self.tree.setItemDelegate(CustomTreeItemDelegate(self.tree))
         self.tree.itemChanged.connect(self.on_item_renamed)
 
+    def _set_item_font_color(self, item, detail_info):
+        """设置树节点字体颜色，从 detail_info 的 font_color 字段读取十六进制颜色"""
+        if detail_info:
+            font_color = detail_info.get('font_color', '')
+            if font_color and font_color.strip():
+                # 设置字体颜色（十六进制颜色）
+                item.setForeground(0, QColor(font_color))
+            else:
+                # 默认黑色
+                item.setForeground(0, QColor("#000000"))
+        else:
+            # 默认黑色
+            item.setForeground(0, QColor("#000000"))
+
     def populate_tree(self, parent_item, path):
         try:
             items = []
@@ -181,6 +195,8 @@ class XPNotebookTree(QWidget):
                     folder_item.setData(0, Qt.UserRole, full_path)
                     folder_item.setData(0, Qt.UserRole + 2, order_dir)
                     folder_item.setText(0, name)
+                    # 设置字体颜色
+                    self._set_item_font_color(folder_item, detail_info)
                     # 加入到集合
                     items.append((folder_item, order_dir))
                     # 懒加载标记项
@@ -193,6 +209,8 @@ class XPNotebookTree(QWidget):
                     folder_item.setData(0, Qt.UserRole + 2, order_dir)
                     folder_item.setText(0, os.path.splitext(name)[0])
                     folder_item.setIcon(0, self.file_icon)
+                    # 设置字体颜色
+                    self._set_item_font_color(folder_item, detail_info)
                     # 加入到集合
                     items.append((folder_item, order_dir))
                     #  也允许子文件结构（懒加载子节点）
@@ -207,6 +225,8 @@ class XPNotebookTree(QWidget):
                     # 使用 Markdown 图标
                     markdown_icon = QIcon(QPixmap(":images/markdown.png"))
                     folder_item.setIcon(0, markdown_icon)
+                    # 设置字体颜色
+                    self._set_item_font_color(folder_item, detail_info)
                     # 加入到集合
                     items.append((folder_item, order_dir))
                     if detail_info and detail_info.get('has_children', False):
@@ -220,6 +240,8 @@ class XPNotebookTree(QWidget):
                     # 使用思维导图图标
                     mindmap_icon = QIcon(QPixmap(":images/markdown.png"))
                     folder_item.setIcon(0, mindmap_icon)
+                    # 设置字体颜色
+                    self._set_item_font_color(folder_item, detail_info)
                     # 加入到集合
                     items.append((folder_item, order_dir))
                     if detail_info and detail_info.get('has_children', False):
@@ -238,6 +260,8 @@ class XPNotebookTree(QWidget):
                         folder_item.setIcon(0, QIcon(QPixmap(close_icon)))
                     else:
                         folder_item.setIcon(0, self.folder_closed_icon)
+                    # 设置字体颜色
+                    self._set_item_font_color(folder_item, detail_info)
                     # 加入到集合
                     items.append((folder_item, order_dir))
                     if detail_info and detail_info.get('has_children', False):
@@ -250,6 +274,8 @@ class XPNotebookTree(QWidget):
                     folder_item.setData(0, Qt.UserRole + 2, order_dir)
                     folder_item.setText(0, name)
                     folder_item.setIcon(0, self.attach_file)  # 用你自己的 epub 图标路径
+                    # 设置字体颜色
+                    self._set_item_font_color(folder_item, detail_info)
                     # 加入到集合
                     items.append((folder_item, order_dir))
                     if detail_info and detail_info.get('has_children', False):
