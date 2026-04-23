@@ -15,11 +15,12 @@ Markdown 编辑器组件
 import os
 import time
 import shutil
+import threading
 from datetime import datetime
 from PySide6.QtWidgets import (
     QTextEdit, QMenu, QMessageBox, QFileDialog, QApplication,
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSplitter,
-    QStackedWidget, QFrame, QPlainTextEdit
+    QStackedWidget, QFrame, QPlainTextEdit, QLineEdit, QListWidget, QListWidgetItem
 )
 from PySide6.QtGui import (
     QImage, QClipboard, QAction, QTextCharFormat,
@@ -170,7 +171,7 @@ class MarkdownEditor(QWidget):
         
         # 顶部工具栏
         toolbar = QFrame()
-        toolbar.setFixedHeight(40)
+        toolbar.setFixedHeight(45)
         toolbar.setStyleSheet("""
             QFrame {
                 background-color: #F8FAFC;
@@ -198,8 +199,9 @@ class MarkdownEditor(QWidget):
         toolbar_layout.addWidget(self.edit_btn)
         toolbar_layout.addWidget(self.preview_btn)
         toolbar_layout.addWidget(self.split_btn)
+
         toolbar_layout.addStretch()
-        
+
         # 文件路径标签
         self.path_label = QLabel("未保存")
         self.path_label.setStyleSheet("""
@@ -858,8 +860,8 @@ class MarkdownEditor(QWidget):
                 # 更新到sqlite表格中
                 indexing_db.add_to_index_queue(rel_path)
             # 3. 检查是否触发批处理
-            if indexing_db.get_queue_size() >= 10:
-                pass
+            if indexing_db.get_queue_size() >= 2:
+                self._execute_batch_indexing(indexing_db, root_path)
 
             logger.info(f"Markdown 文件保存成功: {target_path}")
             return True
@@ -900,3 +902,102 @@ class MarkdownEditor(QWidget):
         self.editor.clear()
         self.md_file_path = None
         self.path_label.setText("未保存")
+
+    def _execute_batch_indexing(self, indexing_db, root_path):
+        """
+        触发后台线程执行批量索引插入（异步执行，不阻塞 GUI）
+
+        Args:
+            indexing_db: NoteDB 实例（indexing_queue.db）
+            root_path: 笔记本根目录的绝对路径
+        """
+        # 启动后台线程处理索引，避免阻塞 GUI
+        thread = threading.Thread(
+            target=self._batch_indexing_worker,
+            args=(root_path,),
+            daemon=True
+        )
+        thread.start()
+        logger.info("🚀 批量索引后台任务已启动")
+
+    def _batch_indexing_worker(self, root_path):
+        """
+        批量索引工作线程（在后台执行）
+
+        Args:
+            root_path: 笔记本根目录的绝对路径
+        """
+        try:
+            from gui.data.ChromaDBManager import get_chroma_manager
+            from gui.data.NoteDB import NoteDB
+
+            # 在线程中创建新的数据库连接（线程安全）
+            indexing_db = NoteDB("indexing_queue.db")
+
+            # 获取 ChromaDBManager 实例（带重试机制）
+            try:
+                chroma_manager = get_chroma_manager()
+            except Exception as e:
+                logger.error(f"ChromaDBManager 初始化失败，跳过本次索引: {e}")
+                return
+
+            # 验证 ChromaDBManager 是否已正确初始化
+            if not hasattr(chroma_manager, 'notes_collection') or chroma_manager.notes_collection is None:
+                logger.error("ChromaDBManager 未正确初始化，跳过本次索引")
+                return
+
+            # 循环处理直到队列为空
+            while True:
+                # 1. 从队列中读取一条记录（按时间顺序）
+                cursor = indexing_db.conn.execute(
+                    'SELECT rel_path, action FROM indexing_queue ORDER BY timestamp LIMIT 1'
+                )
+                task = cursor.fetchone()
+
+                if not task:
+                    break  # 队列为空，退出循环
+
+                rel_path, action = task
+
+                # 2. 转换为绝对路径
+                abs_path = os.path.join(root_path, rel_path)
+                abs_path = os.path.normpath(abs_path)
+
+                # 3. 检查文件是否存在
+                if not os.path.exists(abs_path):
+                    logger.warning(f"文件不存在，跳过索引: {abs_path}")
+                    # 删除不存在的文件记录
+                    indexing_db.conn.execute(
+                        'DELETE FROM indexing_queue WHERE rel_path = ?', (rel_path,)
+                    )
+                    indexing_db.conn.commit()
+                    continue
+
+                # 4. 直接执行索引插入（不使用队列）
+                try:
+                    # 检测文件类型
+                    file_type = chroma_manager._detect_file_type(abs_path)
+
+                    # 直接索引文件（同步执行）
+                    chroma_manager._index_file(abs_path, file_type)
+
+                    # 5. 插入成功后，立即删除该条记录
+                    indexing_db.conn.execute(
+                        'DELETE FROM indexing_queue WHERE rel_path = ?', (rel_path,)
+                    )
+                    indexing_db.conn.commit()
+
+                    logger.info(f"✅ 索引成功并删除记录: {rel_path}")
+
+                except Exception as e:
+                    logger.error(f"❌ 索引失败 {rel_path}: {e}")
+                    # 索引失败时不删除记录，留待下次重试
+                    # 为避免无限循环，暂时跳过这一条
+                    break
+
+            logger.info("批量索引后台任务完成")
+
+        except Exception as e:
+            logger.error(f"批量索引后台任务失败: {e}")
+
+

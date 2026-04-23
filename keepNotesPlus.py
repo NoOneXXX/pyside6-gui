@@ -522,34 +522,25 @@ class MainWindow(QMainWindow):
         format_group.addAction(self.alignr_action)
         format_group.addAction(self.alignj_action)
 
-        color_toolbar = QToolBar("Color")
-        color_toolbar.setIconSize(QSize(16, 16))
-        self.addToolBar(color_toolbar)
-        color_menu = self.menuBar().addMenu("&Format")
-        self.bold_action = QAction(
-            QIcon(":/images/edit-bold.png"), "Bold", self
-        )
-        self.bold_action.setStatusTip("Bold")
-        self.bold_action.setShortcut(QKeySequence.StandardKey.Bold)
-        self.bold_action.setCheckable(True)
-        self.bold_action.triggered.connect(self.toggle_bold)
-        color_toolbar.addAction(self.bold_action)
-        color_menu.addAction(self.bold_action)
 
         # Add search box and button
+        search_toolbar = QToolBar("Search")
+        self.addToolBar(search_toolbar)  # 将工具栏添加到主窗口
         search_widget = QWidget()
         search_layout = QHBoxLayout(search_widget)
         search_layout.setContentsMargins(0, 0, 0, 0)
         self.search_input = QLineEdit()
-        self.search_button = QPushButton("Search")
+        self.search_input.setPlaceholderText("🔍 搜索笔记...")
+        self.search_input.setFixedWidth(200)
+        self.search_button = QPushButton("觅")
         self.search_button.clicked.connect(self.search_text)
         search_layout.addWidget(self.search_input)
         search_layout.addWidget(self.search_button)
         # Add a spacer widget to push search_widget to the right
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        color_toolbar.addWidget(spacer)
-        # color_toolbar.addWidget(search_widget)
+        search_toolbar.addWidget(spacer)
+        search_toolbar.addWidget(search_widget)
 
         self._format_actions = [
             self.fonts,
@@ -750,16 +741,373 @@ class MainWindow(QMainWindow):
             self.rich_text_editor.setTextCursor(cursor)
 
     def search_text(self):
-        """Search for text in the editor."""
-        search_text = self.search_input.text()
-        if not search_text:
+        """Search for text in ChromaDB and highlight results in the left tree."""
+        search_query = self.search_input.text().strip()
+        if not search_query:
+            self.status.showMessage("请输入搜索关键词", 3000)
             return
 
-        cursor = self.rich_text_editor.document().find(search_text, self.rich_text_editor.textCursor())
-        if not cursor.isNull():
-            self.rich_text_editor.setTextCursor(cursor)
-        else:
-            self.status.showMessage("Text not found", 5000)
+        try:
+            # 导入 ChromaDBManager
+            from gui.data.ChromaDBManager import get_chroma_manager
+
+            # 获取 ChromaDBManager 实例
+            try:
+                chroma_manager = get_chroma_manager()
+            except Exception as e:
+                logger.error(f"ChromaDBManager 初始化失败: {e}")
+                self.status.showMessage("搜索服务初始化失败", 5000)
+                return
+
+            # 验证 ChromaDBManager 是否已正确初始化
+            if not hasattr(chroma_manager, 'notes_collection') or chroma_manager.notes_collection is None:
+                logger.error("ChromaDBManager 未正确初始化")
+                self.status.showMessage("搜索服务未就绪", 5000)
+                return
+
+            # 执行搜索
+            logger.info(f"🔍 搜索: {search_query}")
+            results = chroma_manager.search(search_query, n_results=20)
+
+            # 获取搜索结果
+            content_results = results.get("content_results", [])
+            filename_results = results.get("filename_results", [])
+            image_results = results.get("image_results", [])  # CLIP 图片搜索结果
+
+            # 合并结果并提取文件路径和匹配度
+            search_result_paths = set()
+            search_results_with_score = []  # 存储带匹配度的结果
+
+            for result in content_results + filename_results:
+                metadata = result.get("metadata", {})
+                file_path = metadata.get("file_path", "")
+                score = result.get("score", 0)
+                if file_path:
+                    search_result_paths.add(file_path)
+                    search_results_with_score.append({
+                        'file_path': file_path,
+                        'score': score,
+                        'type': 'content' if result in content_results else 'filename'
+                    })
+
+            # 添加图片搜索结果
+            for img_result in image_results:
+                img_path = img_result.get("image_path", "")
+                score = img_result.get("score", 0)
+                source_file = img_result.get("metadata", {}).get("source_file", "")
+                if source_file:
+                    search_result_paths.add(source_file)
+                search_results_with_score.append({
+                    'file_path': img_path,
+                    'score': score,
+                    'type': 'image',
+                    'source_file': source_file
+                })
+
+            # 按匹配度排序
+            search_results_with_score.sort(key=lambda x: x['score'], reverse=True)
+
+            # 打印搜索结果及匹配度
+            logger.info("=" * 60)
+            logger.info(f"搜索结果 (关键词: '{search_query}')")
+            logger.info("=" * 60)
+            for i, result in enumerate(search_results_with_score, 1):
+                score_percent = result['score'] * 100
+                if result['type'] == 'content':
+                    result_type = "内容"
+                elif result['type'] == 'filename':
+                    result_type = "文件名"
+                else:
+                    result_type = "图片"
+                logger.info(f"{i}. [{result_type}] 匹配度: {score_percent:.1f}% - {result['file_path']}")
+            logger.info("=" * 60)
+
+            total_results = len(search_result_paths)
+
+            if total_results == 0:
+                self.status.showMessage(f"未找到与 '{search_query}' 相关的结果", 3000)
+                return
+
+            # 保存当前搜索关键词，用于在编辑器中高亮
+            self.current_search_query = search_query
+
+            # 只取匹配度最高的前10个结果
+            top_results = search_results_with_score[:10]
+
+            # 在左侧树中高亮显示搜索结果
+            if hasattr(self, 'left_tree_widget') and self.left_tree_widget:
+                # 获取左侧树的根路径用于调试
+                root = self.left_tree_widget.tree.invisibleRootItem()
+                if root and root.childCount() > 0:
+                    first_child = root.child(0)
+                    if first_child:
+                        tree_root_path = first_child.data(0, Qt.UserRole)
+                        logger.info(f"左侧树根节点路径: {tree_root_path}")
+                self._highlight_search_results_in_tree(top_results)
+                self.status.showMessage(f"找到 {len(search_result_paths)} 个结果，显示匹配度最高的 {len(top_results)} 个", 5000)
+            else:
+                self.status.showMessage(f"找到 {total_results} 个结果，但左侧树未加载", 3000)
+
+        except Exception as e:
+            logger.error(f"搜索失败: {e}")
+            self.status.showMessage(f"搜索失败: {str(e)}", 5000)
+
+    def _search_images_in_markdown(self, search_query: str, file_paths: set) -> list:
+        """
+        在 Markdown 文件中搜索图片引用
+
+        Args:
+            search_query: 搜索关键词
+            file_paths: Markdown 文件路径集合
+
+        Returns:
+            图片路径列表
+        """
+        import re
+        image_results = []
+
+        for file_path in file_paths:
+            if not file_path.endswith('.md'):
+                continue
+
+            try:
+                # 读取 Markdown 文件内容
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                # 查找图片引用 ![alt](path) 或 <img src="path">
+                # Markdown 格式: ![alt text](image_path)
+                md_images = re.findall(r'!\[([^\]]*)\]\(([^)]+)\)', content)
+                # HTML 格式: <img src="image_path" ...>
+                html_images = re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', content, re.IGNORECASE)
+
+                all_images = [img[1] for img in md_images] + html_images
+
+                for img_path in all_images:
+                    # 检查图片路径或 alt 文本是否包含搜索关键词
+                    if search_query.lower() in img_path.lower() or \
+                       any(search_query.lower() in alt.lower() for alt, _ in md_images):
+                        # 转换为绝对路径
+                        if not os.path.isabs(img_path):
+                            base_dir = os.path.dirname(file_path)
+                            img_path = os.path.normpath(os.path.join(base_dir, img_path))
+
+                        if os.path.exists(img_path):
+                            image_results.append({
+                                'image_path': img_path,
+                                'source_file': file_path,
+                                'type': 'image'
+                            })
+
+            except Exception as e:
+                logger.error(f"读取文件失败 {file_path}: {e}")
+
+        return image_results
+
+    def _get_top5_colors(self) -> list:
+        """
+        返回前5个最匹配文件的柔和颜色
+        每种颜色都有高辨识度且柔和
+
+        Returns:
+            颜色列表，索引0-4对应排名1-5
+        """
+        return [
+            "#FFB3BA",  # 第1名: 柔和粉红 (Salmon Pink)
+            "#BAE1FF",  # 第2名: 柔和天蓝 (Sky Blue)
+            "#BAFFC9",  # 第3名: 柔和薄荷绿 (Mint Green)
+            "#FFFFBA",  # 第4名: 柔和奶油黄 (Cream Yellow)
+            "#E6BAFF",  # 第5名: 柔和薰衣草紫 (Lavender)
+        ]
+
+    def _get_color_by_score(self, score: float, rank: int = -1) -> str:
+        """
+        根据匹配度或排名返回颜色
+        前5名使用不同的柔和颜色，第6名及以后使用渐变的金黄色
+
+        Args:
+            score: 匹配度分数 (0-1)
+            rank: 排名 (0-4 为前5名，-1 表示不使用排名颜色)
+
+        Returns:
+            十六进制颜色字符串
+        """
+        # 前5名使用不同的柔和颜色
+        if 0 <= rank < 5:
+            top5_colors = self._get_top5_colors()
+            return top5_colors[rank]
+
+        # 第6名及以后使用渐变的金黄色（基于匹配度）
+        score_percent = min(score * 100, 90)
+
+        # 5个区间的金黄色，从浅到深
+        colors = [
+            "#FFF9E6",  # 0-18%: 很浅的黄色
+            "#FFEDB3",  # 18-36%: 淡黄色
+            "#FFE180",  # 36-54%: 金黄
+            "#FFD54D",  # 54-72%: 橙色金黄
+            "#FFC400",  # 72-90%: 深橙色
+        ]
+
+        # 计算区间索引 (0-4)
+        index = int(score_percent // 18)
+        index = min(index, 4)
+
+        return colors[index]
+
+    def _highlight_search_results_in_tree(self, search_results: list):
+        """
+        在左侧树中高亮显示搜索结果
+        会先展开所有节点以确保能匹配到所有结果
+        根据匹配度设置颜色深浅
+
+        Args:
+            search_results: 搜索结果列表，每个元素包含 file_path 和 score
+        """
+        from PySide6.QtGui import QColor, QFont
+        from PySide6.QtCore import Qt
+
+        if not hasattr(self, 'left_tree_widget') or not self.left_tree_widget:
+            logger.warning("左侧树控件未加载")
+            return
+
+        tree_widget = self.left_tree_widget.tree
+
+        # 清除之前的高亮
+        self._clear_tree_highlight(tree_widget.invisibleRootItem())
+
+        # 展开所有节点并加载子项
+        logger.info("正在展开所有节点...")
+        self._expand_all_nodes(tree_widget.invisibleRootItem())
+
+        # 收集树中所有项的路径用于调试
+        all_tree_paths = []
+        self._collect_tree_paths(tree_widget.invisibleRootItem(), all_tree_paths)
+        logger.info(f"树中共有 {len(all_tree_paths)} 个项")
+
+        # 高亮匹配的项，根据排名设置颜色
+        highlighted_count = 0
+        for rank, result in enumerate(search_results):
+            file_path = result.get('file_path', '')
+            score = result.get('score', 0)
+
+            # 获取要查找的路径（图片类型使用 source_file）
+            if result.get('type') == 'image':
+                search_path = result.get('source_file', file_path)
+            else:
+                search_path = file_path
+
+            item = self._find_item_by_path(tree_widget.invisibleRootItem(), search_path)
+            if item:
+                # 根据排名获取颜色（前5名使用不同颜色）
+                color = self._get_color_by_score(score, rank)
+                item.setBackground(0, QColor(color))
+                item.setForeground(0, QColor("#000000"))  # 黑色文字
+
+                # 加粗显示
+                font = item.font(0)
+                font.setBold(True)
+                item.setFont(0, font)
+                highlighted_count += 1
+
+                # 在 tooltip 中显示排名和匹配度
+                score_percent = score * 100
+                rank_text = f"第{rank+1}名" if rank < 5 else f"排名{rank+1}"
+                item.setToolTip(0, f"{rank_text} | 匹配度: {score_percent:.1f}%")
+
+                # 确保父节点展开以显示高亮项
+                parent = item.parent()
+                while parent:
+                    parent.setExpanded(True)
+                    parent = parent.parent()
+
+        logger.info(f"高亮显示了 {highlighted_count} 个搜索结果")
+
+    def _expand_all_nodes(self, item):
+        """
+        递归展开所有节点并触发懒加载
+
+        Args:
+            item: 树节点项
+        """
+        for i in range(item.childCount()):
+            child = item.child(i)
+            # 展开节点
+            child.setExpanded(True)
+            # 递归展开子节点
+            self._expand_all_nodes(child)
+
+    def _collect_tree_paths(self, item, paths_list):
+        """收集树中所有项的路径"""
+        item_path = item.data(0, Qt.UserRole)
+        if item_path:
+            paths_list.append(item_path)
+
+        for i in range(item.childCount()):
+            child = item.child(i)
+            self._collect_tree_paths(child, paths_list)
+
+    def _clear_tree_highlight(self, item):
+        """
+        清除树中所有项的高亮
+
+        Args:
+            item: 树节点项
+        """
+        from PySide6.QtGui import QColor
+        from PySide6.QtCore import Qt
+
+        # 清除当前项的高亮
+        item.setBackground(0, QColor("#FFFFFF"))  # 白色背景
+        # 恢复字体
+        font = item.font(0)
+        font.setBold(False)
+        item.setFont(0, font)
+
+        # 递归清除子项
+        for i in range(item.childCount()):
+            child = item.child(i)
+            self._clear_tree_highlight(child)
+
+    def _find_item_by_path(self, parent_item, target_path: str, depth=0):
+        """
+        根据路径在树中查找对应的项
+        支持匹配文件路径或父文件夹路径
+
+        Args:
+            parent_item: 父节点项
+            target_path: 目标路径（可能是文件路径或文件夹路径）
+            depth: 递归深度（用于调试）
+
+        Returns:
+            找到的 QTreeWidgetItem 或 None
+        """
+        # 标准化目标路径
+        norm_target = os.path.normpath(target_path)
+
+        # 检查当前项
+        item_path = parent_item.data(0, Qt.UserRole)
+        if item_path:
+            norm_item = os.path.normpath(item_path)
+
+            # 直接匹配
+            if norm_item == norm_target:
+                return parent_item
+
+            # 如果目标路径是文件路径，检查当前项是否是其父文件夹
+            # ChromaDB 存储的是 document.md 的完整路径，但树中存储的是文件夹路径
+            target_parent = os.path.dirname(norm_target)
+            if norm_item == target_parent:
+                return parent_item
+
+        # 递归查找子项
+        for i in range(parent_item.childCount()):
+            child = parent_item.child(i)
+            result = self._find_item_by_path(child, target_path, depth + 1)
+            if result:
+                return result
+
+        return None
 
     '''
     绑定树状图的结构 当创建了新的笔记的时候就将树状图重新渲染
@@ -977,7 +1325,7 @@ class MainWindow(QMainWindow):
                 save_result = self.markdown_editor.save_file()
                 if not save_result:
                     logger.error(f"保存当前 Markdown 文件失败: {current_md_path}")
-            
+
             # 保存完成后再设置新路径并加载
             self.markdown_editor.set_file_path(md_path)
             if os.path.exists(md_path):
@@ -988,14 +1336,17 @@ class MainWindow(QMainWindow):
                 self.markdown_editor.split_editor.clear()
             self.path = md_path
             self.update_title()
+
+            # 如果有搜索关键词，高亮匹配内容
+            self._highlight_search_in_editor()
             return
-        
+
         # 从其他编辑器切换过来时，先保存当前编辑器内容
         if self.current_editor_type == "mindmap" and self.mindmap_editor and self.mindmap_editor.mindmap_file_path:
             self.mindmap_editor.save_file()
         elif self.current_editor_type == "richtext" and self.richtext_saved_path:
             self.auto_save_note()
-        
+
         # 切换到 Markdown 编辑器（只是切换堆叠窗口索引，无闪烁）
         self.markdown_editor.set_file_path(md_path)
         if os.path.exists(md_path):
@@ -1004,16 +1355,104 @@ class MainWindow(QMainWindow):
             # 如果文件不存在，清空编辑器内容
             self.markdown_editor.editor.clear()
             self.markdown_editor.split_editor.clear()
-        
+
         # 切换堆叠窗口索引
         self.editor_stack.setCurrentIndex(1)
         self.current_editor = self.markdown_editor
         self.current_editor_type = "markdown"
-        
+
         # 更新标题
         self.path = md_path
         self.update_title()
+
+        # 如果有搜索关键词，高亮匹配内容
+        self._highlight_search_in_editor()
     
+    def _highlight_search_in_editor(self):
+        """
+        在编辑器中高亮显示搜索关键词
+        如果有 current_search_query，则在编辑器中查找并高亮
+        """
+        logger.info(f"_highlight_search_in_editor 被调用")
+
+        if not hasattr(self, 'current_search_query') or not self.current_search_query:
+            logger.info("没有搜索关键词，跳过高亮")
+            return
+
+        if not hasattr(self, 'markdown_editor') or not self.markdown_editor:
+            logger.info("Markdown 编辑器未初始化，跳过高亮")
+            return
+
+        search_text = self.current_search_query.strip()
+        if not search_text:
+            logger.info("搜索关键词为空，跳过高亮")
+            return
+
+        logger.info(f"尝试在编辑器中高亮搜索关键词: '{search_text}'")
+
+        try:
+            from PySide6.QtGui import QTextCursor, QTextCharFormat, QColor, QTextDocument
+
+            # 获取编辑器实例
+            editor = self.markdown_editor.editor
+
+            # 检查编辑器内容
+            document = editor.document()
+            content = document.toPlainText()
+            logger.info(f"编辑器内容长度: {len(content)} 字符")
+
+            # 检查是否包含搜索关键词（不区分大小写）
+            if search_text.lower() not in content.lower():
+                logger.info(f"编辑器内容中不包含搜索关键词 '{search_text}'")
+                return
+
+            # 查找并高亮所有匹配项
+            highlight_format = QTextCharFormat()
+            highlight_format.setBackground(QColor("#FF6B6B"))  # 红色背景
+            highlight_format.setForeground(QColor("#FFFFFF"))  # 白色文字
+
+            # 使用 find 方法查找文本（不区分大小写）
+            find_cursor = QTextCursor(document)
+            find_cursor.movePosition(QTextCursor.Start)  # 从文档开头开始
+            found_count = 0
+
+            # 使用 QTextDocument.FindFlag 而不是 int
+            find_flags = QTextDocument.FindFlag(0)  # 0 表示默认，不区分大小写
+
+            while True:
+                # 查找下一个匹配
+                find_cursor = document.find(search_text, find_cursor, find_flags)
+                if find_cursor.isNull():
+                    break
+
+                # 高亮匹配文本 - 使用 setCharFormat 而不是 mergeCharFormat
+                find_cursor.setCharFormat(highlight_format)
+                found_count += 1
+                logger.debug(f"找到第 {found_count} 处匹配")
+
+                # 移动光标到匹配文本之后继续查找
+                find_cursor.movePosition(QTextCursor.EndOfWord)
+
+            logger.info(f"在编辑器中高亮显示了 {found_count} 处匹配")
+
+            # 同样处理分屏编辑器
+            if hasattr(self.markdown_editor, 'split_editor'):
+                split_editor = self.markdown_editor.split_editor
+                split_document = split_editor.document()
+                split_cursor = QTextCursor(split_document)
+                split_cursor.movePosition(QTextCursor.Start)
+                while True:
+                    split_cursor = split_document.find(search_text, split_cursor, find_flags)
+                    if split_cursor.isNull():
+                        break
+                    split_cursor.setCharFormat(highlight_format)
+                    split_cursor.movePosition(QTextCursor.EndOfWord)
+
+        except Exception as e:
+            logger.error(f"编辑器搜索高亮失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
     def auto_save_markdown(self):
         """自动保存 Markdown 文件"""
         if hasattr(self, 'markdown_editor') and self.markdown_editor:

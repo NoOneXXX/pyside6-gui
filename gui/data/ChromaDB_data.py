@@ -91,8 +91,8 @@ if __name__ == "__main__":
     # 测试添加文本
     service.add_note(
         doc_id="note_1",
-        text="这是关于PySide6绘图模糊的解决办法",
-        metadata={"type": "markdown", "tags": "pyside6"}
+        text="这是关于绘图模糊的解决办法",
+        metadata={"type": "markdown", "tags": "绘画"}
     )
     service.add_note(
         doc_id="note_2",
@@ -102,4 +102,4 @@ if __name__ == "__main__":
 
     # 测试搜索
     print("\n搜索结果:")
-    print(service.search("python", n_results=3))
+    print(service.search("编程", n_results=3))
