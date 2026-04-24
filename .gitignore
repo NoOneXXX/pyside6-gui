@@ -8,5 +8,6 @@ bin
 target
 pdfjs/pdfs
 *.pyc
+__pycache__/
 
 
