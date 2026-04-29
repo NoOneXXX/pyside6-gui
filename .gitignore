@@ -7,6 +7,9 @@ out
 bin
 target
 pdfjs/pdfs
+*.sqlite3
+*.bin
+*.xml
 
 
 

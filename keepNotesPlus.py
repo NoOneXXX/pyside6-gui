@@ -532,6 +532,8 @@ class MainWindow(QMainWindow):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍 搜索笔记...")
         self.search_input.setFixedWidth(200)
+        self.search_input.textChanged.connect(self._on_search_input_changed)
+        self.search_input.returnPressed.connect(self.search_text)
         self.search_button = QPushButton("觅")
         self.search_button.clicked.connect(self.search_text)
         search_layout.addWidget(self.search_input)
@@ -740,6 +742,15 @@ class MainWindow(QMainWindow):
             cursor.mergeCharFormat(fmt)
             self.rich_text_editor.setTextCursor(cursor)
 
+    def _on_search_input_changed(self, text):
+        """搜索输入框内容变化时，如果清空则恢复树的原始显示"""
+        if not text.strip():
+            # 搜索框为空，恢复树的所有项
+            if hasattr(self, 'left_tree_widget') and self.left_tree_widget:
+                root = self.left_tree_widget.tree.invisibleRootItem()
+                self._clear_tree_highlight(root)
+                self.current_search_query = ""
+
     def search_text(self):
         """Search for text in ChromaDB and highlight results in the left tree."""
         search_query = self.search_input.text().strip()
@@ -765,78 +776,52 @@ class MainWindow(QMainWindow):
                 self.status.showMessage("搜索服务未就绪", 5000)
                 return
 
-            # 执行搜索
+            # 执行搜索 - 仅搜索内容，只返回10条匹配结果
             logger.info(f"🔍 搜索: {search_query}")
-            results = chroma_manager.search(search_query, n_results=20)
+            results = chroma_manager.search(search_query, n_results=10,
+                                            search_in_content=True,
+                                            search_in_filename=False)
 
-            # 获取搜索结果
+            # 只取内容搜索结果
             content_results = results.get("content_results", [])
-            filename_results = results.get("filename_results", [])
-            image_results = results.get("image_results", [])  # CLIP 图片搜索结果
 
-            # 合并结果并提取文件路径和匹配度
-            search_result_paths = set()
-            search_results_with_score = []  # 存储带匹配度的结果
-
-            for result in content_results + filename_results:
+            # 提取文件路径和匹配度
+            search_results_with_score = []
+            seen_paths = set()
+            for result in content_results:
                 metadata = result.get("metadata", {})
                 file_path = metadata.get("file_path", "")
                 score = result.get("score", 0)
-                if file_path:
-                    search_result_paths.add(file_path)
+                if file_path and file_path not in seen_paths:
+                    seen_paths.add(file_path)
                     search_results_with_score.append({
                         'file_path': file_path,
                         'score': score,
-                        'type': 'content' if result in content_results else 'filename'
+                        'type': 'content'
                     })
 
-            # 添加图片搜索结果
-            for img_result in image_results:
-                img_path = img_result.get("image_path", "")
-                score = img_result.get("score", 0)
-                source_file = img_result.get("metadata", {}).get("source_file", "")
-                if source_file:
-                    search_result_paths.add(source_file)
-                search_results_with_score.append({
-                    'file_path': img_path,
-                    'score': score,
-                    'type': 'image',
-                    'source_file': source_file
-                })
-
-            # 按匹配度排序
+            # 按匹配度排序（最高的在最前面），只取前10条
             search_results_with_score.sort(key=lambda x: x['score'], reverse=True)
+            top_results = search_results_with_score[:10]
 
-            # 打印搜索结果及匹配度
+            # 打印搜索结果
             logger.info("=" * 60)
             logger.info(f"搜索结果 (关键词: '{search_query}')")
             logger.info("=" * 60)
-            for i, result in enumerate(search_results_with_score, 1):
+            for i, result in enumerate(top_results, 1):
                 score_percent = result['score'] * 100
-                if result['type'] == 'content':
-                    result_type = "内容"
-                elif result['type'] == 'filename':
-                    result_type = "文件名"
-                else:
-                    result_type = "图片"
-                logger.info(f"{i}. [{result_type}] 匹配度: {score_percent:.1f}% - {result['file_path']}")
+                logger.info(f"{i}. 匹配度: {score_percent:.1f}% - {result['file_path']}")
             logger.info("=" * 60)
 
-            total_results = len(search_result_paths)
-
-            if total_results == 0:
+            if not top_results:
                 self.status.showMessage(f"未找到与 '{search_query}' 相关的结果", 3000)
                 return
 
             # 保存当前搜索关键词，用于在编辑器中高亮
             self.current_search_query = search_query
 
-            # 只取匹配度最高的前10个结果
-            top_results = search_results_with_score[:10]
-
-            # 在左侧树中高亮显示搜索结果
+            # 在左侧树中只显示匹配的10条结果
             if hasattr(self, 'left_tree_widget') and self.left_tree_widget:
-                # 获取左侧树的根路径用于调试
                 root = self.left_tree_widget.tree.invisibleRootItem()
                 if root and root.childCount() > 0:
                     first_child = root.child(0)
@@ -844,9 +829,9 @@ class MainWindow(QMainWindow):
                         tree_root_path = first_child.data(0, Qt.UserRole)
                         logger.info(f"左侧树根节点路径: {tree_root_path}")
                 self._highlight_search_results_in_tree(top_results)
-                self.status.showMessage(f"找到 {len(search_result_paths)} 个结果，显示匹配度最高的 {len(top_results)} 个", 5000)
+                self.status.showMessage(f"显示 {len(top_results)} 条匹配结果", 5000)
             else:
-                self.status.showMessage(f"找到 {total_results} 个结果，但左侧树未加载", 3000)
+                self.status.showMessage("左侧树未加载", 3000)
 
         except Exception as e:
             logger.error(f"搜索失败: {e}")
@@ -957,12 +942,14 @@ class MainWindow(QMainWindow):
 
     def _highlight_search_results_in_tree(self, search_results: list):
         """
-        在左侧树中高亮显示搜索结果
-        会先展开所有节点以确保能匹配到所有结果
-        根据匹配度设置颜色深浅
+        在左侧树中只显示匹配的搜索结果
+        - 隐藏所有不匹配的项
+        - 只显示匹配的10条结果及其父级路径
+        - 用颜色区分匹配度排名
+        - 最匹配的排到最上面
 
         Args:
-            search_results: 搜索结果列表，每个元素包含 file_path 和 score
+            search_results: 搜索结果列表，按匹配度从高到低排序
         """
         from PySide6.QtGui import QColor, QFont
         from PySide6.QtCore import Qt
@@ -972,56 +959,110 @@ class MainWindow(QMainWindow):
             return
 
         tree_widget = self.left_tree_widget.tree
+        root_item = tree_widget.invisibleRootItem()
 
-        # 清除之前的高亮
-        self._clear_tree_highlight(tree_widget.invisibleRootItem())
+        # 1. 先清除之前的高亮，恢复所有项的显示状态
+        self._clear_tree_highlight(root_item)
 
-        # 展开所有节点并加载子项
+        # 2. 展开所有节点以确保能匹配到所有结果
         logger.info("正在展开所有节点...")
-        self._expand_all_nodes(tree_widget.invisibleRootItem())
+        self._expand_all_nodes(root_item)
 
-        # 收集树中所有项的路径用于调试
-        all_tree_paths = []
-        self._collect_tree_paths(tree_widget.invisibleRootItem(), all_tree_paths)
-        logger.info(f"树中共有 {len(all_tree_paths)} 个项")
+        # 3. 先隐藏所有树节点（保留根节点的第一层子节点即笔记本根目录）
+        self._set_all_items_hidden(root_item, True)
 
-        # 高亮匹配的项，根据排名设置颜色
-        highlighted_count = 0
+        # 4. 10种颜色区分排名（从高到低）
+        rank_colors = [
+            "#FF6B6B",  # 第1名: 鲜红
+            "#FF8E53",  # 第2名: 橙红
+            "#FFA94D",  # 第3名: 橙色
+            "#FFD43B",  # 第4名: 金黄
+            "#A9E34B",  # 第5名: 黄绿
+            "#69DB7C",  # 第6名: 绿色
+            "#38D9A9",  # 第7名: 青绿
+            "#4DABF7",  # 第8名: 天蓝
+            "#748FFC",  # 第9名: 靛蓝
+            "#DA77F2",  # 第10名: 紫色
+        ]
+
+        # 5. 查找匹配的树项，记录排名和所属父节点
+        matched_items = []  # (rank, result, tree_item)
         for rank, result in enumerate(search_results):
             file_path = result.get('file_path', '')
-            score = result.get('score', 0)
-
-            # 获取要查找的路径（图片类型使用 source_file）
-            if result.get('type') == 'image':
-                search_path = result.get('source_file', file_path)
-            else:
-                search_path = file_path
-
-            item = self._find_item_by_path(tree_widget.invisibleRootItem(), search_path)
+            if not file_path:
+                continue
+            item = self._find_item_by_path(root_item, file_path)
             if item:
-                # 根据排名获取颜色（前5名使用不同颜色）
-                color = self._get_color_by_score(score, rank)
-                item.setBackground(0, QColor(color))
-                item.setForeground(0, QColor("#000000"))  # 黑色文字
+                matched_items.append((rank, result, item))
 
-                # 加粗显示
-                font = item.font(0)
-                font.setBold(True)
-                item.setFont(0, font)
-                highlighted_count += 1
+        # 6. 显示匹配项及其父级路径，并重新排序：最匹配的排最上
+        # 记录需要显示的父节点 -> 其匹配子项的映射
+        parent_matched_children = {}  # parent_item -> [(rank, child_item)]
 
-                # 在 tooltip 中显示排名和匹配度
-                score_percent = score * 100
-                rank_text = f"第{rank+1}名" if rank < 5 else f"排名{rank+1}"
-                item.setToolTip(0, f"{rank_text} | 匹配度: {score_percent:.1f}%")
+        for rank, result, item in matched_items:
+            # 显示匹配项
+            item.setHidden(False)
 
-                # 确保父节点展开以显示高亮项
-                parent = item.parent()
-                while parent:
-                    parent.setExpanded(True)
-                    parent = parent.parent()
+            # 收集父级路径，确保父节点可见
+            parent = item.parent()
+            while parent and parent != root_item:
+                parent.setHidden(False)
+                parent.setExpanded(True)
+                if parent not in parent_matched_children:
+                    parent_matched_children[parent] = []
+                parent_matched_children[parent].append((rank, item))
+                parent = parent.parent()
 
-        logger.info(f"高亮显示了 {highlighted_count} 个搜索结果")
+            # 确保根节点的第一层子节点也可见
+            top_parent = item.parent()
+            while top_parent and top_parent.parent() and top_parent.parent() != root_item:
+                top_parent = top_parent.parent()
+            if top_parent:
+                top_parent.setHidden(False)
+
+        # 7. 在每个父节点内，将匹配的子项按排名重新排序（最匹配的排最上）
+        for parent_item, children in parent_matched_children.items():
+            # 按排名从小到大排序（排名0是最匹配的，应排在最前面）
+            children.sort(key=lambda x: x[0])
+
+            # 从后往前（排名低的先移），将匹配项移到父节点的最前面
+            for idx, (rank, child_item) in enumerate(children):
+                # 从原位置取出
+                row = parent_item.indexOfChild(child_item)
+                if row >= 0:
+                    parent_item.takeChild(row)
+                # 插入到排名对应的位置（排在最前面的位置）
+                parent_item.insertChild(idx, child_item)
+
+        # 8. 显示根节点第一层子节点（笔记本根目录）
+        for i in range(root_item.childCount()):
+            root_child = root_item.child(i)
+            root_child.setHidden(False)
+
+        # 9. 存储匹配度数据，由 CustomTreeItemDelegate 绘制气泡徽章
+        for rank, result, item in matched_items:
+            score = result.get('score', 0)
+            score_percent = score * 100
+
+            # 存储匹配度百分比（委托用 UserRole+11 读取）
+            item.setData(0, Qt.UserRole + 11, score_percent)
+
+            # 存储排名颜色（委托用 UserRole+12 读取）
+            color = rank_colors[rank] if rank < len(rank_colors) else "#888888"
+            item.setData(0, Qt.UserRole + 12, color)
+
+            # 加粗显示
+            font = item.font(0)
+            font.setBold(True)
+            item.setFont(0, font)
+
+            # 确保父节点展开
+            parent = item.parent()
+            while parent:
+                parent.setExpanded(True)
+                parent = parent.parent()
+
+        logger.info(f"显示 {len(matched_items)} 条搜索结果（已隐藏不匹配项）")
 
     def _expand_all_nodes(self, item):
         """
@@ -1047,9 +1088,22 @@ class MainWindow(QMainWindow):
             child = item.child(i)
             self._collect_tree_paths(child, paths_list)
 
+    def _set_all_items_hidden(self, parent_item, hidden: bool):
+        """
+        递归设置所有子项的隐藏状态
+
+        Args:
+            parent_item: 父节点项
+            hidden: True 隐藏，False 显示
+        """
+        for i in range(parent_item.childCount()):
+            child = parent_item.child(i)
+            child.setHidden(hidden)
+            self._set_all_items_hidden(child, hidden)
+
     def _clear_tree_highlight(self, item):
         """
-        清除树中所有项的高亮
+        清除树中所有项的高亮，恢复原始文本和显示状态
 
         Args:
             item: 树节点项
@@ -1057,12 +1111,18 @@ class MainWindow(QMainWindow):
         from PySide6.QtGui import QColor
         from PySide6.QtCore import Qt
 
-        # 清除当前项的高亮
-        item.setBackground(0, QColor("#FFFFFF"))  # 白色背景
+        # 清除匹配度气泡数据
+        item.setData(0, Qt.UserRole + 11, None)  # 匹配度百分比
+        item.setData(0, Qt.UserRole + 12, None)  # 排名颜色
+
+        # 恢复前景色
+        item.setForeground(0, QColor("#000000"))
         # 恢复字体
         font = item.font(0)
         font.setBold(False)
         item.setFont(0, font)
+        # 恢复显示
+        item.setHidden(False)
 
         # 递归清除子项
         for i in range(item.childCount()):
