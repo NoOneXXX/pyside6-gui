@@ -78,7 +78,7 @@ except Exception as e:
     write_startup_log(f"Qt资源文件导入失败: {e}", "ERROR")
     raise
 
-from PySide6.QtCore import QSize, Qt, QtMsgType, qInstallMessageHandler, Slot, QUrl, QTimer
+from PySide6.QtCore import QSize, Qt, QtMsgType, qInstallMessageHandler, Slot, QUrl, QTimer, QThread, Signal
 from PySide6.QtGui import QAction, QActionGroup, QFont, QIcon, QKeySequence, QTextCharFormat, QTextDocument, QImage
 from PySide6.QtPrintSupport import QPrintDialog
 from PySide6.QtWidgets import (
@@ -117,6 +117,88 @@ from gui.func.under_top_menu.color_picker import ColorPickerTool
 import shutil
 from urllib.parse import quote
 from gui.func.utils import logger
+
+
+class SearchWorker(QThread):
+    """后台执行 ChromaDB 搜索，避免阻塞 GUI 线程。"""
+
+    result_ready = Signal(str, list, str)
+
+    def __init__(self, query: str, n_results: int = 10, parent=None):
+        super().__init__(parent)
+        self.query = query
+        self.n_results = n_results
+
+    def run(self):
+        try:
+            from gui.data.ChromaDBManager import get_chroma_manager
+
+            chroma_manager = get_chroma_manager()
+            if not hasattr(chroma_manager, 'notes_collection') or chroma_manager.notes_collection is None:
+                self.result_ready.emit(self.query, [], "搜索服务未就绪")
+                return
+
+            logger.info(f"后台搜索: {self.query}")
+            results = chroma_manager.search(
+                self.query,
+                n_results=self.n_results,
+                search_in_content=True,
+                search_in_filename=False,
+                search_images=False,
+            )
+
+            content_results = results.get("content_results", [])
+            search_results_with_score = []
+            seen_paths = set()
+            for result in content_results:
+                metadata = result.get("metadata", {})
+                file_path = metadata.get("file_path", "")
+                score = result.get("score", 0)
+                if file_path and file_path not in seen_paths:
+                    seen_paths.add(file_path)
+                    search_results_with_score.append({
+                        'file_path': file_path,
+                        'score': score,
+                        'type': 'content'
+                    })
+
+            search_results_with_score.sort(key=lambda x: x['score'], reverse=True)
+            self.result_ready.emit(self.query, search_results_with_score[:self.n_results], "")
+
+        except Exception as e:
+            logger.error(f"后台搜索失败: {e}")
+            self.result_ready.emit(self.query, [], str(e))
+
+
+class SearchWarmupWorker(QThread):
+    """启动后后台预热 ChromaDB，避免第一次搜索时加载模型。"""
+
+    ready = Signal(bool, str)
+
+    def run(self):
+        try:
+            from gui.data.ChromaDBManager import get_chroma_manager
+
+            chroma_manager = get_chroma_manager()
+            if hasattr(chroma_manager, 'notes_collection') and chroma_manager.notes_collection is not None:
+                try:
+                    if chroma_manager.notes_collection.count() > 0:
+                        chroma_manager.search(
+                            "__keepnotesplus_warmup__",
+                            n_results=1,
+                            search_in_content=True,
+                            search_in_filename=False,
+                            search_images=False,
+                        )
+                except Exception as query_error:
+                    logger.warning(f"搜索服务预热查询失败，继续标记为就绪: {query_error}")
+                self.ready.emit(True, "搜索服务已就绪")
+            else:
+                self.ready.emit(False, "搜索服务未正确初始化")
+        except Exception as e:
+            logger.error(f"搜索服务预热失败: {e}")
+            self.ready.emit(False, str(e))
+
 
 # Custom Qt message handler for debugging
 def qt_message_handler(msg_type: QtMsgType, context, msg: str):
@@ -530,11 +612,14 @@ class MainWindow(QMainWindow):
         search_layout = QHBoxLayout(search_widget)
         search_layout.setContentsMargins(0, 0, 0, 0)
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 搜索笔记...")
-        self.search_input.setFixedWidth(200)
+        self.search_input.setPlaceholderText("🪄 智能搜索笔记...")
+        self.search_input.setMinimumWidth(200)
+        self.search_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.search_input.textChanged.connect(self._on_search_input_changed)
         self.search_input.returnPressed.connect(self.search_text)
         self.search_button = QPushButton("觅")
+        self.search_button.setFixedSize(50, 28)
+        self.search_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.search_button.clicked.connect(self.search_text)
         search_layout.addWidget(self.search_input)
         search_layout.addWidget(self.search_button)
@@ -752,90 +837,68 @@ class MainWindow(QMainWindow):
                 self.current_search_query = ""
 
     def search_text(self):
-        """Search for text in ChromaDB and highlight results in the left tree."""
+        """异步搜索 ChromaDB，避免阻塞 GUI 线程。"""
         search_query = self.search_input.text().strip()
         if not search_query:
             self.status.showMessage("请输入搜索关键词", 3000)
             return
 
-        try:
-            # 导入 ChromaDBManager
-            from gui.data.ChromaDBManager import get_chroma_manager
+        if hasattr(self, '_search_worker') and self._search_worker and self._search_worker.isRunning():
+            self.status.showMessage("正在搜索，请稍候", 3000)
+            return
 
-            # 获取 ChromaDBManager 实例
-            try:
-                chroma_manager = get_chroma_manager()
-            except Exception as e:
-                logger.error(f"ChromaDBManager 初始化失败: {e}")
-                self.status.showMessage("搜索服务初始化失败", 5000)
-                return
+        self.search_button.setEnabled(False)
+        self.status.showMessage(f"正在搜索: {search_query}", 0)
 
-            # 验证 ChromaDBManager 是否已正确初始化
-            if not hasattr(chroma_manager, 'notes_collection') or chroma_manager.notes_collection is None:
-                logger.error("ChromaDBManager 未正确初始化")
-                self.status.showMessage("搜索服务未就绪", 5000)
-                return
+        self._search_worker = SearchWorker(search_query, n_results=10, parent=self)
+        self._search_worker.result_ready.connect(self._on_search_finished)
+        self._search_worker.finished.connect(self._cleanup_search_worker)
+        self._search_worker.start()
 
-            # 执行搜索 - 仅搜索内容，只返回10条匹配结果
-            logger.info(f"🔍 搜索: {search_query}")
-            results = chroma_manager.search(search_query, n_results=10,
-                                            search_in_content=True,
-                                            search_in_filename=False)
+    @Slot(str, list, str)
+    def _on_search_finished(self, search_query, top_results, error_message):
+        """后台搜索完成后回到 GUI 线程更新树。"""
+        self.search_button.setEnabled(True)
 
-            # 只取内容搜索结果
-            content_results = results.get("content_results", [])
+        if error_message:
+            logger.error(f"搜索失败: {error_message}")
+            self.status.showMessage(f"搜索失败: {error_message}", 5000)
+            return
 
-            # 提取文件路径和匹配度
-            search_results_with_score = []
-            seen_paths = set()
-            for result in content_results:
-                metadata = result.get("metadata", {})
-                file_path = metadata.get("file_path", "")
-                score = result.get("score", 0)
-                if file_path and file_path not in seen_paths:
-                    seen_paths.add(file_path)
-                    search_results_with_score.append({
-                        'file_path': file_path,
-                        'score': score,
-                        'type': 'content'
-                    })
+        # 如果搜索期间用户改了输入框，忽略旧结果，避免错位高亮。
+        if self.search_input.text().strip() != search_query:
+            self.status.showMessage("搜索结果已过期", 3000)
+            return
 
-            # 按匹配度排序（最高的在最前面），只取前10条
-            search_results_with_score.sort(key=lambda x: x['score'], reverse=True)
-            top_results = search_results_with_score[:10]
+        logger.info("=" * 60)
+        logger.info(f"搜索结果 (关键词: '{search_query}')")
+        logger.info("=" * 60)
+        for i, result in enumerate(top_results, 1):
+            score_percent = result['score'] * 100
+            logger.info(f"{i}. 匹配度: {score_percent:.1f}% - {result['file_path']}")
+        logger.info("=" * 60)
 
-            # 打印搜索结果
-            logger.info("=" * 60)
-            logger.info(f"搜索结果 (关键词: '{search_query}')")
-            logger.info("=" * 60)
-            for i, result in enumerate(top_results, 1):
-                score_percent = result['score'] * 100
-                logger.info(f"{i}. 匹配度: {score_percent:.1f}% - {result['file_path']}")
-            logger.info("=" * 60)
-
-            if not top_results:
-                self.status.showMessage(f"未找到与 '{search_query}' 相关的结果", 3000)
-                return
-
-            # 保存当前搜索关键词，用于在编辑器中高亮
-            self.current_search_query = search_query
-
-            # 在左侧树中只显示匹配的10条结果
+        if not top_results:
             if hasattr(self, 'left_tree_widget') and self.left_tree_widget:
                 root = self.left_tree_widget.tree.invisibleRootItem()
-                if root and root.childCount() > 0:
-                    first_child = root.child(0)
-                    if first_child:
-                        tree_root_path = first_child.data(0, Qt.UserRole)
-                        logger.info(f"左侧树根节点路径: {tree_root_path}")
-                self._highlight_search_results_in_tree(top_results)
-                self.status.showMessage(f"显示 {len(top_results)} 条匹配结果", 5000)
-            else:
-                self.status.showMessage("左侧树未加载", 3000)
+                self._clear_tree_highlight(root)
+            self.status.showMessage(f"未找到与 '{search_query}' 相关的结果", 3000)
+            return
 
-        except Exception as e:
-            logger.error(f"搜索失败: {e}")
-            self.status.showMessage(f"搜索失败: {str(e)}", 5000)
+        self.current_search_query = search_query
+
+        if hasattr(self, 'left_tree_widget') and self.left_tree_widget:
+            self._highlight_search_results_in_tree(top_results)
+            self.status.showMessage(f"显示 {len(top_results)} 条匹配结果", 5000)
+        else:
+            self.status.showMessage("左侧树未加载", 3000)
+
+    @Slot()
+    def _cleanup_search_worker(self):
+        """释放搜索线程对象。"""
+        if hasattr(self, '_search_worker') and self._search_worker:
+            self._search_worker.deleteLater()
+            self._search_worker = None
 
     def _search_images_in_markdown(self, search_query: str, file_paths: set) -> list:
         """
@@ -964,14 +1027,10 @@ class MainWindow(QMainWindow):
         # 1. 先清除之前的高亮，恢复所有项的显示状态
         self._clear_tree_highlight(root_item)
 
-        # 2. 展开所有节点以确保能匹配到所有结果
-        logger.info("正在展开所有节点...")
-        self._expand_all_nodes(root_item)
-
-        # 3. 先隐藏所有树节点（保留根节点的第一层子节点即笔记本根目录）
+        # 2. 先隐藏所有树节点（保留根节点的第一层子节点即笔记本根目录）
         self._set_all_items_hidden(root_item, True)
 
-        # 4. 10种颜色区分排名（从高到低）
+        # 3. 10种颜色区分排名（从高到低）
         rank_colors = [
             "#FF6B6B",  # 第1名: 鲜红
             "#FF8E53",  # 第2名: 橙红
@@ -985,17 +1044,18 @@ class MainWindow(QMainWindow):
             "#DA77F2",  # 第10名: 紫色
         ]
 
-        # 5. 查找匹配的树项，记录排名和所属父节点
+        # 4. 查找匹配的树项，记录排名和所属父节点
+        # 只按搜索结果路径懒加载必要父链，避免展开整棵树导致 GUI 卡顿。
         matched_items = []  # (rank, result, tree_item)
         for rank, result in enumerate(search_results):
             file_path = result.get('file_path', '')
             if not file_path:
                 continue
-            item = self._find_item_by_path(root_item, file_path)
+            item = self._find_item_by_path_with_lazy_load(file_path)
             if item:
                 matched_items.append((rank, result, item))
 
-        # 6. 显示匹配项及其父级路径，并重新排序：最匹配的排最上
+        # 5. 显示匹配项及其父级路径，并重新排序：最匹配的排最上
         # 记录需要显示的父节点 -> 其匹配子项的映射
         parent_matched_children = {}  # parent_item -> [(rank, child_item)]
 
@@ -1020,7 +1080,7 @@ class MainWindow(QMainWindow):
             if top_parent:
                 top_parent.setHidden(False)
 
-        # 7. 在每个父节点内，将匹配的子项按排名重新排序（最匹配的排最上）
+        # 6. 在每个父节点内，将匹配的子项按排名重新排序（最匹配的排最上）
         for parent_item, children in parent_matched_children.items():
             # 按排名从小到大排序（排名0是最匹配的，应排在最前面）
             children.sort(key=lambda x: x[0])
@@ -1034,12 +1094,12 @@ class MainWindow(QMainWindow):
                 # 插入到排名对应的位置（排在最前面的位置）
                 parent_item.insertChild(idx, child_item)
 
-        # 8. 显示根节点第一层子节点（笔记本根目录）
+        # 7. 显示根节点第一层子节点（笔记本根目录）
         for i in range(root_item.childCount()):
             root_child = root_item.child(i)
             root_child.setHidden(False)
 
-        # 9. 存储匹配度数据，由 CustomTreeItemDelegate 绘制气泡徽章
+        # 8. 存储匹配度数据，由 CustomTreeItemDelegate 绘制气泡徽章
         for rank, result, item in matched_items:
             score = result.get('score', 0)
             score_percent = score * 100
@@ -1128,6 +1188,72 @@ class MainWindow(QMainWindow):
         for i in range(item.childCount()):
             child = item.child(i)
             self._clear_tree_highlight(child)
+
+    def _find_item_by_path_with_lazy_load(self, target_path: str):
+        """
+        按目标路径只加载必要的树节点父链。
+        ChromaDB 存的是 document.md 等内容文件路径，而左侧树存的是笔记目录路径。
+        """
+        if not hasattr(self, 'left_tree_widget') or not self.left_tree_widget:
+            return None
+
+        root_item = self.left_tree_widget.tree.invisibleRootItem()
+        norm_target = os.path.normpath(target_path)
+
+        content_file_names = {"document.md", "mindmap.json", ".note.html"}
+        target_name = os.path.basename(norm_target).lower()
+        target_ext = os.path.splitext(norm_target)[1].lower()
+        if target_name in content_file_names or target_ext in {".md", ".markdown", ".html", ".htm"}:
+            tree_target_path = os.path.dirname(norm_target)
+        else:
+            tree_target_path = norm_target
+
+        # 已加载的节点先直接找，通常最快。
+        found = self._find_item_by_path(root_item, tree_target_path)
+        if found:
+            return found
+
+        for i in range(root_item.childCount()):
+            notebook_item = root_item.child(i)
+            notebook_path = notebook_item.data(0, Qt.UserRole)
+            if not notebook_path:
+                continue
+
+            norm_notebook_path = os.path.normpath(notebook_path)
+            if tree_target_path == norm_notebook_path:
+                return notebook_item
+            if not tree_target_path.startswith(norm_notebook_path + os.sep):
+                continue
+
+            rel_path = os.path.relpath(tree_target_path, norm_notebook_path)
+            parts = [part for part in rel_path.split(os.sep) if part and part != "."]
+            current_item = notebook_item
+            current_path = norm_notebook_path
+
+            for part in parts:
+                # 懒加载占位节点只有一个空文本子节点，按需展开当前层。
+                if current_item.childCount() == 1 and current_item.child(0).text(0) == "":
+                    current_item.takeChild(0)
+                    self.left_tree_widget.populate_tree(current_item, current_path)
+
+                expected_child_path = os.path.normpath(os.path.join(current_path, part))
+                next_item = None
+                for child_index in range(current_item.childCount()):
+                    child = current_item.child(child_index)
+                    child_path = child.data(0, Qt.UserRole)
+                    if child_path and os.path.normpath(child_path) == expected_child_path:
+                        next_item = child
+                        break
+
+                if next_item is None:
+                    return None
+
+                current_item = next_item
+                current_path = expected_child_path
+
+            return current_item
+
+        return None
 
     def _find_item_by_path(self, parent_item, target_path: str, depth=0):
         """

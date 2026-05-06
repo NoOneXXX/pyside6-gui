@@ -119,9 +119,10 @@ class ChromaDBManager:
                 device=self.device
             )
 
-            # 5. 初始化 CLIP 模型用于图片
-            self.image_ef = OpenCLIPEmbeddingFunction(device=self.device)
-            self.image_loader = ImageLoader()
+            # 5. 图片模型按需初始化，避免纯文本搜索时加载 OpenCLIP 造成卡顿
+            self.image_ef = None
+            self.image_loader = None
+            self.image_collection = None
 
             # 6. 创建/获取集合
             # 文本集合：存储笔记内容的向量
@@ -141,17 +142,6 @@ class ChromaDBManager:
                 metadata={
                     "hnsw:space": "cosine",
                     "description": "笔记元数据集合"
-                }
-            )
-
-            # 图片集合：存储图片的向量（使用 CLIP）
-            self.image_collection = self.client.get_or_create_collection(
-                name="notes_images",
-                embedding_function=self.image_ef,
-                data_loader=self.image_loader,
-                metadata={
-                    "hnsw:space": "cosine",
-                    "description": "图片向量集合"
                 }
             )
 
@@ -345,6 +335,23 @@ class ChromaDBManager:
         print(f"✅ 批量处理完成 | 更新: {len(update_tasks)} | 删除: {len(delete_tasks)}")
     
     # ==================== 文件索引核心方法 ====================
+
+    def _ensure_image_collection(self):
+        """按需初始化图片集合和 OpenCLIP 模型。"""
+        if self.image_collection is not None:
+            return
+
+        self.image_ef = OpenCLIPEmbeddingFunction(device=self.device)
+        self.image_loader = ImageLoader()
+        self.image_collection = self.client.get_or_create_collection(
+            name="notes_images",
+            embedding_function=self.image_ef,
+            data_loader=self.image_loader,
+            metadata={
+                "hnsw:space": "cosine",
+                "description": "图片向量集合"
+            }
+        )
     
     def _index_file(self, file_path: str, file_type: str):
         """索引单个文件"""
@@ -432,6 +439,8 @@ class ChromaDBManager:
             return
 
         try:
+            self._ensure_image_collection()
+
             # 生成图片ID
             img_id = self._generate_doc_id(img_path)
 
@@ -620,7 +629,8 @@ class ChromaDBManager:
     def search(self, query: str, n_results: int = 10, 
                file_type: str = None, 
                search_in_content: bool = True,
-               search_in_filename: bool = True) -> Dict:
+               search_in_filename: bool = True,
+               search_images: bool = True) -> Dict:
         """
         搜索笔记
         
@@ -630,6 +640,7 @@ class ChromaDBManager:
             file_type: 过滤文件类型 ('markdown', 'html', None表示全部)
             search_in_content: 是否在内容中搜索
             search_in_filename: 是否在文件名中搜索
+            search_images: 是否在图片集合中搜索
         
         Returns:
             搜索结果字典
@@ -637,6 +648,7 @@ class ChromaDBManager:
         results = {
             "content_results": [],
             "filename_results": [],
+            "image_results": [],
             "total_results": 0
         }
         
@@ -667,15 +679,16 @@ class ChromaDBManager:
                 print(f"❌ 文件名搜索失败: {e}")
         
         # 在图片中搜索（使用 CLIP 模型）
-        try:
-            image_results = self.image_collection.query(
-                query_texts=[query],
-                n_results=n_results
-            )
-            results["image_results"] = self._format_image_results(image_results)
-        except Exception as e:
-            print(f"❌ 图片搜索失败: {e}")
-            results["image_results"] = []
+        if search_images:
+            try:
+                self._ensure_image_collection()
+                image_results = self.image_collection.query(
+                    query_texts=[query],
+                    n_results=n_results
+                )
+                results["image_results"] = self._format_image_results(image_results)
+            except Exception as e:
+                print(f"❌ 图片搜索失败: {e}")
 
         results["total_results"] = len(results["content_results"]) + len(results["filename_results"]) + len(results.get("image_results", []))
         return results
