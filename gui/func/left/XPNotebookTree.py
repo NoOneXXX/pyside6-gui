@@ -7,6 +7,7 @@ from gui.func.left.file_encryption.encryption_data import FolderEncryptor
 from gui.func.left.file_encryption.EncryptPasswordDialog import EncryptPasswordDialog, EncryptSuccessDialog
 from gui.func.right_bottom_corner.RichTextEdit import RichTextEdit
 from gui.func.left.ColorPickerDialog import show_color_picker
+from gui.func.left.ConfirmDialog import ConfirmDialog
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidget,
     QTreeWidgetItem, QStyleFactory, QMessageBox, QHeaderView, QInputDialog, QFileDialog,
@@ -1765,6 +1766,28 @@ class XPNotebookTree(QWidget):
         self.rich_text_edit = rich_text
 
     '''
+    将指定路径写入笔记本根目录下的 .gitignore，使其不再纳入 GitHub 管理
+    '''
+    def _exclude_from_git(self, target_path):
+        try:
+            rel_path = os.path.relpath(target_path, self.custom_path).replace(os.sep, '/')
+            gitignore_path = os.path.join(self.custom_path, ".gitignore")
+
+            existing_lines = []
+            if os.path.exists(gitignore_path):
+                with open(gitignore_path, 'r', encoding='utf-8') as f:
+                    existing_lines = f.read().splitlines()
+
+            if rel_path not in existing_lines:
+                with open(gitignore_path, 'a', encoding='utf-8') as f:
+                    if existing_lines and existing_lines[-1] != '':
+                        f.write('\n')
+                    f.write(f"{rel_path}\n")
+        except Exception:
+            # 写入 .gitignore 失败不应影响附件的正常添加
+            pass
+
+    '''
     右键点击
     添加附件
     '''
@@ -1778,10 +1801,32 @@ class XPNotebookTree(QWidget):
         )
         # 选择了文件
         if file_path:
+            # 检查附件大小，超过 100M 提示用户（GitHub 单文件限制为 100M）
+            max_size_bytes = 100 * 1024 * 1024
+            file_size = os.path.getsize(file_path)
+            is_oversized = file_size > max_size_bytes
+            if is_oversized:
+                size_mb = file_size / (1024 * 1024)
+                confirmed = ConfirmDialog.ask(
+                    self,
+                    "文件过大",
+                    f"该附件大小为 {size_mb:.1f}M，超过了 100M。\n"
+                    f"超过 100M 的文件无法上传到 GitHub 仓库。\n"
+                    f"是否仍然添加该附件？（添加后将不会纳入 GitHub 管理）",
+                    icon="⚠️",
+                    icon_bg="#FEF3C7",
+                    confirm_text="仍然添加",
+                    cancel_text="取消",
+                    confirm_color="#F59E0B",
+                    confirm_hover_color="#D97706",
+                )
+                if not confirmed:
+                    return
+
             # 获取路径
             base_dir_path = item.data(0, Qt.UserRole)
             created_folder = False
-            
+
             try:
                 # 将它的父类改成has_childer true 这个可以在创建的时候是否有子集
                 editor = JsonEditor()
@@ -1814,6 +1859,10 @@ class XPNotebookTree(QWidget):
                 create_metadata_file_under_dir(target_file_path, 'attachfile_' + ext_types, max_order_num_by_child_dir)
                 # 复制这个文件到新的文件夹下面
                 copy_and_overwrite(file_path, target_file_path)
+
+                # 超过 100M 的附件不纳入 GitHub 管理，写入 .gitignore
+                if is_oversized:
+                    self._exclude_from_git(target_file_path)
 
                 new_item = QTreeWidgetItem()
                 new_item.setText(0, file_name)
@@ -2062,12 +2111,14 @@ class ModernContextMenu(QWidget):
         self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
-        
+
         self.actions = []
         self.hovered_index = -1
-        self.item_height = 44
-        self.min_width = 220
-        
+        self.item_height = 32
+        self.separator_height = 9
+        self.padding_v = 6
+        self.min_width = 190
+
         # 设置鼠标追踪
         self.setMouseTracking(True)
 
@@ -2085,142 +2136,130 @@ class ModernContextMenu(QWidget):
         """添加分隔线"""
         self.actions.append({'type': 'separator'})
         
-    def show_menu(self, pos):
-        """显示菜单"""
-        # 计算菜单大小
-        total_height = 20  # 上下边距
+    def _calc_total_height(self):
+        """计算菜单总高度"""
+        total_height = self.padding_v * 2
         for action in self.actions:
             if action['type'] == 'separator':
-                total_height += 14
+                total_height += self.separator_height
             else:
                 total_height += self.item_height
-        
+        return total_height
+
+    def show_menu(self, pos):
+        """显示菜单，若下方空间不足（如被任务栏遮挡）则自动向上弹出"""
+        total_height = self._calc_total_height()
         self.setFixedSize(self.min_width, total_height)
-        self.move(pos)
+
+        screen = QApplication.screenAt(pos) or QApplication.primaryScreen()
+        available = screen.availableGeometry()  # 不含任务栏的可用区域
+
+        x = pos.x()
+        y = pos.y()
+
+        # 水平方向：超出右边界则向左收回
+        if x + self.width() > available.right():
+            x = available.right() - self.width()
+        x = max(x, available.left())
+
+        # 垂直方向：下方放不下（会被任务栏挡住）则向上弹出
+        if y + self.height() > available.bottom():
+            y = pos.y() - self.height()
+        y = max(y, available.top())
+
+        self.move(x, y)
         self.show()
 
     def paintEvent(self, event):
-        from PySide6.QtGui import QPainter, QFont, QPen, QBrush, QPainterPath, QLinearGradient
-        
+        from PySide6.QtCore import QRect
+        from PySide6.QtGui import QPainter, QFont, QPen, QPainterPath, QFontMetrics
+
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.TextAntialiasing)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform)
-        
-        # 绘制阴影背景
+
+        # 柔和阴影
         shadow_path = QPainterPath()
-        shadow_path.addRoundedRect(4, 4, self.width() - 8, self.height() - 8, 16, 16)
-        painter.fillPath(shadow_path, QColor(0, 0, 0, 30))
-        
-        # 绘制渐变背景 - 优雅的浅灰蓝色调
-        gradient = QLinearGradient(0, 0, 0, self.height())
-        gradient.setColorAt(0, QColor("#FAFBFC"))
-        gradient.setColorAt(0.5, QColor("#F5F7FA"))
-        gradient.setColorAt(1, QColor("#EEF2F7"))
-        
+        shadow_path.addRoundedRect(3, 4, self.width() - 6, self.height() - 6, 12, 12)
+        painter.fillPath(shadow_path, QColor(0, 0, 0, 26))
+
+        # 简洁的纯色卡片背景 + 细边框
         bg_path = QPainterPath()
-        bg_path.addRoundedRect(0, 0, self.width(), self.height(), 16, 16)
-        painter.fillPath(bg_path, gradient)
-        
-        # 绘制边框 - 柔和的蓝灰色
-        border_pen = QPen(QColor("#D1D5DB"), 1)
-        painter.setPen(border_pen)
+        bg_path.addRoundedRect(0, 0, self.width() - 2, self.height() - 2, 12, 12)
+        painter.fillPath(bg_path, QColor("#FFFFFF"))
+        painter.setPen(QPen(QColor("#EEF0F3"), 1))
         painter.drawPath(bg_path)
-        
-        # 绘制内发光效果
-        inner_path = QPainterPath()
-        inner_path.addRoundedRect(1, 1, self.width() - 2, self.height() - 2, 15, 15)
-        inner_pen = QPen(QColor(255, 255, 255, 180), 1)
-        painter.setPen(inner_pen)
-        painter.drawPath(inner_path)
-        
-        # 绘制菜单项
-        y = 10
+
+        icon_font = QFont("Segoe UI Emoji", 11)
+        text_font = QFont("Microsoft YaHei UI", 10)
+        text_font.setWeight(QFont.Medium)
+        text_metrics = QFontMetrics(text_font)
+
+        icon_size = 20
+
+        y = self.padding_v
         for i, action in enumerate(self.actions):
             if action['type'] == 'separator':
-                # 绘制渐变分隔线
-                gradient_line = QLinearGradient(24, 0, self.width() - 24, 0)
-                gradient_line.setColorAt(0, QColor("#E5E7EB"))
-                gradient_line.setColorAt(0.5, QColor("#D1D5DB"))
-                gradient_line.setColorAt(1, QColor("#E5E7EB"))
-                pen = QPen(gradient_line, 1)
-                painter.setPen(pen)
-                painter.drawLine(24, y + 6, self.width() - 24, y + 6)
-                y += 14
+                painter.setPen(QPen(QColor("#EDEFF2"), 1))
+                mid = y + self.separator_height // 2
+                painter.drawLine(12, mid, self.width() - 12, mid)
+                y += self.separator_height
             else:
-                # 绘制悬停背景 - 柔和的蓝紫色渐变
+                # 悬停背景
                 if i == self.hovered_index:
-                    hover_gradient = QLinearGradient(8, y, 8, y + self.item_height - 2)
-                    hover_gradient.setColorAt(0, QColor("#EEF2FF"))
-                    hover_gradient.setColorAt(1, QColor("#E0E7FF"))
                     hover_path = QPainterPath()
-                    hover_path.addRoundedRect(8, y, self.width() - 16, self.item_height - 2, 10, 10)
-                    painter.fillPath(hover_path, hover_gradient)
-                    
-                    # 悬停边框
-                    hover_border = QPen(QColor("#C7D2FE"), 1)
-                    painter.setPen(hover_border)
-                    painter.drawPath(hover_path)
-                
-                # 绘制图标背景圆圈
+                    hover_path.addRoundedRect(5, y + 1, self.width() - 10, self.item_height - 2, 7, 7)
+                    painter.fillPath(hover_path, QColor("#EEF2FF"))
+
+                # 图标背景徽标
+                icon_y = y + (self.item_height - icon_size) // 2
                 icon_bg_path = QPainterPath()
-                icon_bg_path.addRoundedRect(16, y + 8, 26, 26, 6, 6)
+                icon_bg_path.addRoundedRect(10, icon_y, icon_size, icon_size, 6, 6)
                 icon_bg_color = QColor(action['color'])
-                icon_bg_color.setAlpha(15)
+                icon_bg_color.setAlpha(18)
                 painter.fillPath(icon_bg_path, icon_bg_color)
-                
-                # 绘制图标
-                icon_font = QFont("Segoe UI Emoji", 13)
+
                 painter.setFont(icon_font)
                 painter.setPen(QColor(action['color']))
-                painter.drawText(20, y + self.item_height - 14, action['icon'])
-                
-                # 绘制文字
-                text_font = QFont("Microsoft YaHei UI", 10)
-                text_font.setWeight(QFont.Medium)
+                painter.drawText(QRect(10, icon_y, icon_size, icon_size), Qt.AlignCenter, action['icon'])
+
+                # 文字（垂直居中）
                 painter.setFont(text_font)
-                if i == self.hovered_index:
-                    painter.setPen(QColor("#4F46E5"))
-                else:
-                    painter.setPen(QColor("#374151"))
-                painter.drawText(52, y + self.item_height - 13, action['text'])
-                
+                painter.setPen(QColor("#4F46E5") if i == self.hovered_index else QColor("#374151"))
+                baseline_y = y + (self.item_height + text_metrics.ascent() - text_metrics.descent()) // 2
+                painter.drawText(38, int(baseline_y), action['text'])
+
                 y += self.item_height
-        
+
         painter.end()
-        
+
+    def _hit_test(self, pos_y):
+        """根据 y 坐标命中测试，返回菜单项索引，未命中返回 -1"""
+        y = self.padding_v
+        for i, action in enumerate(self.actions):
+            if action['type'] == 'separator':
+                y += self.separator_height
+            else:
+                if y <= pos_y <= y + self.item_height:
+                    return i
+                y += self.item_height
+        return -1
+
     def mouseMoveEvent(self, event):
         """鼠标移动事件"""
-        y = 8
-        for i, action in enumerate(self.actions):
-            if action['type'] == 'separator':
-                y += 12
-            else:
-                if y <= event.pos().y() <= y + self.item_height:
-                    if self.hovered_index != i:
-                        self.hovered_index = i
-                        self.update()
-                    return
-                y += self.item_height
-        
-        if self.hovered_index != -1:
-            self.hovered_index = -1
+        index = self._hit_test(event.pos().y())
+        if index != self.hovered_index:
+            self.hovered_index = index
             self.update()
-            
+
     def mousePressEvent(self, event):
         """鼠标点击事件"""
-        y = 8
-        for i, action in enumerate(self.actions):
-            if action['type'] == 'separator':
-                y += 12
-            else:
-                if y <= event.pos().y() <= y + self.item_height:
-                    self.hide()
-                    if action['callback']:
-                        action['callback']()
-                    return
-                y += self.item_height
+        index = self._hit_test(event.pos().y())
         self.hide()
+        if index != -1:
+            callback = self.actions[index].get('callback')
+            if callback:
+                callback()
         
     def leaveEvent(self, event):
         """鼠标离开事件"""
