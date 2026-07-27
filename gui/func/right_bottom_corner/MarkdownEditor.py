@@ -27,13 +27,38 @@ from PySide6.QtGui import (
     QSyntaxHighlighter
 )
 from PySide6.QtCore import (
-    QUrl, Qt, Signal, QRegularExpression, QTimer, QObject, Slot
+    QUrl, Qt, Signal, QRegularExpression, QTimer, QObject, Slot, QEvent
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtWebChannel import QWebChannel
 
 from gui.func.utils import logger
 from gui.func.right_bottom_corner.MarkdownRenderer import render_markdown
+
+
+class PreviewWebView(QWebEngineView):
+    """
+    支持 Ctrl+C 复制选中内容的 WebView。
+
+    QWebEngineView 默认不会拦截 ShortcutOverride 事件，导致主窗口里
+    绑定在 self（顶层窗口）上的全局 Ctrl+C QAction（触发的是富文本编辑器的
+    copy()）会抢先响应，使预览区域的 Ctrl+C 失效，只能靠右键菜单复制。
+    这里显式接管 Ctrl+C，交给页面自身的选区复制。
+    """
+
+    def event(self, e):
+        if e.type() == QEvent.Type.ShortcutOverride and e.matches(QKeySequence.StandardKey.Copy):
+            e.accept()
+            return True
+        return super().event(e)
+
+    def keyPressEvent(self, e):
+        if e.matches(QKeySequence.StandardKey.Copy):
+            self.page().triggerAction(QWebEnginePage.WebAction.Copy)
+            e.accept()
+            return
+        super().keyPressEvent(e)
 
 
 class CopyHandler(QObject):
@@ -240,7 +265,7 @@ class MarkdownEditor(QWidget):
         self.highlighter = MarkdownHighlighter(self.editor.document())
         
         # 预览模式
-        self.preview = QWebEngineView()
+        self.preview = PreviewWebView()
         self.preview.setStyleSheet("""
             QWebEngineView {
                 border: none;
@@ -272,7 +297,7 @@ class MarkdownEditor(QWidget):
         self.split_editor.customContextMenuRequested.connect(self._show_context_menu)
         self.split_editor.installEventFilter(self)
         
-        self.split_preview = QWebEngineView()
+        self.split_preview = PreviewWebView()
         self.split_preview.setStyleSheet("""
             QWebEngineView {
                 border: none;
